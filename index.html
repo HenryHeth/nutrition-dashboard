@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nutrition Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --card: #16213e;
+            --accent: #e94560;
+            --protein: #4ade80;
+            --carbs: #60a5fa;
+            --fat: #fbbf24;
+            --text: #eee;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 1rem;
+            min-height: 100vh;
+        }
+        h1 { 
+            text-align: center; 
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: var(--card);
+            border-radius: 8px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .control-group label {
+            font-size: 0.75rem;
+            color: #aaa;
+        }
+        input[type="date"], select, button {
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #333;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 1rem;
+        }
+        button {
+            background: var(--accent);
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { opacity: 0.9; }
+        button.active { box-shadow: 0 0 0 2px var(--protein); }
+        .toggle-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .toggle-btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+        .toggle-btn.protein { background: var(--protein); color: #000; }
+        .toggle-btn.carbs { background: var(--carbs); color: #000; }
+        .toggle-btn.fat { background: var(--fat); color: #000; }
+        .toggle-btn.inactive { opacity: 0.3; }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            color: #f472b6;
+        }
+        .checkbox-label input[type="checkbox"] {
+            width: 1.2rem;
+            height: 1.2rem;
+            accent-color: #f472b6;
+        }
+        .chat-container {
+            background: var(--card);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            color: #aaa;
+        }
+        .chat-input-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 1rem;
+        }
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .chat-send {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+        }
+        .chat-response {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--bg);
+            border-radius: 8px;
+            color: var(--text);
+            white-space: pre-wrap;
+            display: none;
+        }
+        .chat-response.visible { display: block; }
+        .detail-level {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+        }
+        .detail-label { color: #aaa; }
+        .radio-label {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            cursor: pointer;
+            color: var(--text);
+        }
+        .radio-label input[type="radio"] {
+            accent-color: var(--accent);
+        }
+        .chat-loading {
+            color: #aaa;
+            font-style: italic;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .stat-card {
+            background: var(--card);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-card .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .stat-card .label {
+            font-size: 0.75rem;
+            color: #aaa;
+        }
+        .stat-card.protein .value { color: var(--protein); }
+        .stat-card.carbs .value { color: var(--carbs); }
+        .stat-card.fat .value { color: var(--fat); }
+        .stat-card.calories .value { color: var(--accent); }
+        .chart-container {
+            background: var(--card);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .chart-container.resizable {
+            padding-bottom: 0;
+        }
+        .chart-title {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: #aaa;
+        }
+        .chart-wrapper {
+            height: 300px;
+            min-height: 150px;
+            max-height: 600px;
+            overflow: hidden;
+        }
+        .chart-wrapper canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .resize-handle {
+            height: 20px;
+            background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.05));
+            cursor: ns-resize;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0 0 8px 8px;
+            user-select: none;
+            touch-action: none;
+        }
+        .resize-handle::after {
+            content: '';
+            width: 40px;
+            height: 4px;
+            background: #555;
+            border-radius: 2px;
+        }
+        .resize-handle:hover::after,
+        .resize-handle:active::after {
+            background: var(--accent);
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <h1>🍎 Nutrition Dashboard</h1>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label>From</label>
+            <input type="date" id="startDate">
+        </div>
+        <div class="control-group">
+            <label>To</label>
+            <input type="date" id="endDate">
+        </div>
+        <div class="control-group">
+            <label>Aggregate</label>
+            <select id="aggregate">
+                <option value="day">Daily</option>
+                <option value="week" selected>Weekly</option>
+                <option value="month">Monthly</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Show</label>
+            <div class="toggle-group">
+                <button class="toggle-btn protein active" data-macro="protein">Protein</button>
+                <button class="toggle-btn carbs active" data-macro="carbs">Carbs</button>
+                <button class="toggle-btn fat active" data-macro="fat">Fat</button>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>Weight</label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="weightToggle" checked>
+                <span>Show weight overlay</span>
+            </label>
+        </div>
+        <div class="control-group">
+            <label>Quick</label>
+            <select id="quickRange">
+                <option value="">Custom</option>
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="365" selected>Last year</option>
+                <option value="all">All time</option>
+            </select>
+        </div>
+    </div>
+    
+    <div class="stats">
+        <div class="stat-card calories">
+            <div class="value" id="avgCalories">-</div>
+            <div class="label">Avg Calories/day</div>
+        </div>
+        <div class="stat-card protein">
+            <div class="value" id="avgProtein">-</div>
+            <div class="label">Avg Protein (g)</div>
+        </div>
+        <div class="stat-card carbs">
+            <div class="value" id="avgCarbs">-</div>
+            <div class="label">Avg Carbs (g)</div>
+        </div>
+        <div class="stat-card fat">
+            <div class="value" id="avgFat">-</div>
+            <div class="label">Avg Fat (g)</div>
+        </div>
+        <div class="stat-card">
+            <div class="value" id="daysLogged">-</div>
+            <div class="label">Days Logged</div>
+        </div>
+    </div>
+    
+    <div class="chart-container resizable">
+        <div class="chart-title">Macros Over Time (stacked) + Weight</div>
+        <div class="chart-wrapper" id="macroChartWrapper">
+            <canvas id="macroChart"></canvas>
+        </div>
+        <div class="resize-handle" data-target="macroChartWrapper"></div>
+    </div>
+    
+    <div class="chat-container">
+        <div class="chat-header">
+            <span>🤖</span>
+            <span>Ask Henry about your nutrition data</span>
+        </div>
+        <div class="chat-input-row">
+            <input type="text" class="chat-input" id="chatInput" placeholder="e.g., What's the correlation between my protein intake and weight?" onkeypress="if(event.key==='Enter')askHenry()">
+            <button class="chat-send" onclick="askHenry()">Ask</button>
+        </div>
+        <div class="detail-level">
+            <span class="detail-label">Detail:</span>
+            <label class="radio-label"><input type="radio" name="detailLevel" value="low"> Brief</label>
+            <label class="radio-label"><input type="radio" name="detailLevel" value="medium" checked> Medium</label>
+            <label class="radio-label"><input type="radio" name="detailLevel" value="high"> Detailed</label>
+            <label class="checkbox-label" style="margin-left: 1rem;"><input type="checkbox" id="humourToggle"> 😄 A dash of humour</label>
+        </div>
+        <div class="chat-response" id="chatResponse"></div>
+    </div>
+    
+    <div class="chart-container resizable">
+        <div class="chart-title">Calories & Protein Trend</div>
+        <div class="chart-wrapper" id="trendChartWrapper">
+            <canvas id="trendChart"></canvas>
+        </div>
+        <div class="resize-handle" data-target="trendChartWrapper"></div>
+    </div>
+
+    <script>
+        let allData = [];
+        let weightData = [];
+        let macroChart, trendChart;
+        let showMacros = { protein: true, carbs: true, fat: true, weight: true };
+        
+        // === AUTH ===
+        let authToken = localStorage.getItem('nutrition_auth_token');
+        
+        function getAuthHeaders() {
+            return authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+        }
+        
+        function showLoginForm() {
+            document.body.innerHTML = `
+                <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; background: var(--bg);">
+                    <div style="background: var(--card); padding: 2rem; border-radius: 12px; text-align: center; max-width: 400px;">
+                        <h1 style="color: var(--accent); margin-bottom: 1rem;">🍎 Nutrition Dashboard</h1>
+                        <p style="color: #aaa; margin-bottom: 1.5rem;">Enter password to access your data</p>
+                        <input type="password" id="loginPassword" placeholder="Password" 
+                            style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #333; background: var(--bg); color: var(--text); font-size: 1rem; margin-bottom: 1rem;">
+                        <button onclick="doLogin()" 
+                            style="width: 100%; padding: 0.75rem; background: var(--accent); border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; font-size: 1rem;">
+                            Login
+                        </button>
+                        <p id="loginError" style="color: #ff6b6b; margin-top: 1rem; display: none;"></p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('loginPassword').addEventListener('keypress', e => {
+                if (e.key === 'Enter') doLogin();
+            });
+        }
+        
+        async function doLogin() {
+            const password = document.getElementById('loginPassword').value;
+            const errorEl = document.getElementById('loginError');
+            
+            try {
+                const res = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success && data.token) {
+                    authToken = data.token;
+                    localStorage.setItem('nutrition_auth_token', authToken);
+                    location.reload();
+                } else {
+                    errorEl.textContent = 'Invalid password';
+                    errorEl.style.display = 'block';
+                }
+            } catch (e) {
+                errorEl.textContent = 'Connection error';
+                errorEl.style.display = 'block';
+            }
+        }
+        
+        async function checkAuth() {
+            // Try loading data - if it fails with 401, show login
+            try {
+                const res = await fetch('/api/nutrition?from=2026-01-01&to=2026-01-02', {
+                    headers: getAuthHeaders()
+                });
+                if (res.status === 401) {
+                    showLoginForm();
+                    return false;
+                }
+                return true;
+            } catch (e) {
+                return true; // Network error, try anyway
+            }
+        }
+        
+        // Load weight data from server
+        async function loadWeightData() {
+            try {
+                const res = await fetch('/api/weight', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    const data = json.data || json;
+                    if (data && data.length > 0) {
+                        weightData = data.map(d => ({
+                            date: d.date,
+                            weight: Math.round(d.weight * 10) / 10  // Converted to lbs in API
+                        })).filter(d => d.date && d.weight);
+                        weightData.sort((a, b) => a.date.localeCompare(b.date));
+                        console.log(`Loaded ${weightData.length} weight entries`);
+                    }
+                }
+            } catch (e) {
+                console.log('No weight data available');
+            }
+        }
+        
+        // Ask Henry chat function
+        async function askHenry() {
+            const input = document.getElementById('chatInput');
+            const response = document.getElementById('chatResponse');
+            const question = input.value.trim();
+            
+            if (!question) return;
+            
+            response.classList.add('visible');
+            response.innerHTML = '<span class="chat-loading">Henry is analyzing your data...</span>';
+            
+            // Prepare context about the current data
+            const filtered = getFilteredData();
+            const detailLevel = document.querySelector('input[name="detailLevel"]:checked')?.value || 'medium';
+            const withHumour = document.getElementById('humourToggle')?.checked || false;
+            const context = {
+                question,
+                detailLevel,
+                withHumour,
+                dateRange: {
+                    start: document.getElementById('startDate').value,
+                    end: document.getElementById('endDate').value
+                },
+                stats: {
+                    daysLogged: filtered.length,
+                    avgCalories: filtered.length ? Math.round(filtered.reduce((s, d) => s + d.calories, 0) / filtered.length) : 0,
+                    avgProtein: filtered.length ? Math.round(filtered.reduce((s, d) => s + d.protein, 0) / filtered.length) : 0,
+                    avgCarbs: filtered.length ? Math.round(filtered.reduce((s, d) => s + d.carbs, 0) / filtered.length) : 0,
+                    avgFat: filtered.length ? Math.round(filtered.reduce((s, d) => s + d.fat, 0) / filtered.length) : 0
+                },
+                weightData: weightData.filter(w => w.date >= document.getElementById('startDate').value && w.date <= document.getElementById('endDate').value),
+                recentDays: filtered.slice(-14)  // Last 14 days of detail
+            };
+            
+            try {
+                const res = await fetch('/api/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                    body: JSON.stringify(context)
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    response.textContent = data.answer;
+                } else {
+                    response.textContent = 'Sorry, I couldn\'t process that question. Try again?';
+                }
+            } catch (e) {
+                response.textContent = 'Chat API not available. Make sure the server supports /api/ask endpoint.';
+            }
+        }
+        
+        // Load data
+        async function loadData() {
+            try {
+                const res = await fetch('/api/nutrition', { headers: getAuthHeaders() });
+                const json = await res.json();
+                const data = json.data || json;
+                allData = data.map(d => ({
+                    date: d.date,
+                    calories: parseInt(d.calories) || 0,
+                    protein: parseFloat(d.protein_g) || 0,
+                    carbs: parseFloat(d.carbs_g) || 0,
+                    fat: parseFloat(d.fat_g) || 0,
+                    fiber: parseFloat(d.fiber_g) || 0,
+                    sugar: parseFloat(d.sugar_g) || 0,
+                    sodium: parseInt(d.sodium_mg) || 0
+                })).filter(d => d.calories > 0);
+                allData.sort((a, b) => a.date.localeCompare(b.date));
+                initControls();
+                updateCharts();
+            } catch (e) {
+                console.error('Failed to load data:', e);
+                document.body.innerHTML = '<div class="loading">Failed to load data. Check API connection.</div>';
+            }
+        }
+        
+        function initControls() {
+            const dates = allData.map(d => d.date);
+            const minDate = dates[0];
+            const maxDate = dates[dates.length - 1];
+            
+            document.getElementById('startDate').min = minDate;
+            document.getElementById('startDate').max = maxDate;
+            document.getElementById('endDate').min = minDate;
+            document.getElementById('endDate').max = maxDate;
+            
+            // Default to last year
+            setQuickRange(365);
+            
+            // Event listeners
+            document.getElementById('startDate').addEventListener('change', () => {
+                document.getElementById('quickRange').value = '';
+                updateCharts();
+            });
+            document.getElementById('endDate').addEventListener('change', () => {
+                document.getElementById('quickRange').value = '';
+                updateCharts();
+            });
+            document.getElementById('aggregate').addEventListener('change', updateCharts);
+            document.getElementById('quickRange').addEventListener('change', (e) => {
+                if (e.target.value) setQuickRange(e.target.value);
+            });
+            
+            // Macro toggles (buttons)
+            document.querySelectorAll('.toggle-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const macro = btn.dataset.macro;
+                    showMacros[macro] = !showMacros[macro];
+                    btn.classList.toggle('inactive', !showMacros[macro]);
+                    btn.classList.toggle('active', showMacros[macro]);
+                    updateCharts();
+                });
+            });
+            
+            // Weight checkbox
+            document.getElementById('weightToggle').addEventListener('change', (e) => {
+                showMacros.weight = e.target.checked;
+                updateCharts();
+            });
+        }
+        
+        function setQuickRange(days) {
+            const end = allData[allData.length - 1]?.date;
+            let start;
+            
+            if (days === 'all') {
+                start = allData[0]?.date;
+            } else {
+                const d = new Date(end);
+                d.setDate(d.getDate() - parseInt(days));
+                start = d.toISOString().split('T')[0];
+            }
+            
+            document.getElementById('startDate').value = start;
+            document.getElementById('endDate').value = end;
+            updateCharts();
+        }
+        
+        function getFilteredData() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            return allData.filter(d => d.date >= start && d.date <= end);
+        }
+        
+        function aggregateData(data, period) {
+            if (period === 'day') return data;
+            
+            const groups = {};
+            data.forEach(d => {
+                let key;
+                if (period === 'week') {
+                    const date = new Date(d.date);
+                    const weekStart = new Date(date);
+                    weekStart.setDate(date.getDate() - date.getDay());
+                    key = weekStart.toISOString().split('T')[0];
+                } else if (period === 'month') {
+                    key = d.date.substring(0, 7) + '-01';
+                }
+                
+                if (!groups[key]) {
+                    groups[key] = { date: key, calories: 0, protein: 0, carbs: 0, fat: 0, count: 0 };
+                }
+                groups[key].calories += d.calories || 0;
+                groups[key].protein += d.protein || 0;
+                groups[key].carbs += d.carbs || 0;
+                groups[key].fat += d.fat || 0;
+                groups[key].count++;
+            });
+            
+            // Average per day in period
+            return Object.values(groups).map(g => ({
+                date: g.date,
+                calories: Math.round(g.calories / g.count),
+                protein: Math.round(g.protein / g.count),
+                carbs: Math.round(g.carbs / g.count),
+                fat: Math.round(g.fat / g.count)
+            })).sort((a, b) => a.date.localeCompare(b.date));
+        }
+        
+        function updateCharts() {
+            const filtered = getFilteredData();
+            const aggregate = document.getElementById('aggregate').value;
+            const data = aggregateData(filtered, aggregate);
+            
+            // Update stats
+            if (filtered.length > 0) {
+                const avgCal = Math.round(filtered.reduce((s, d) => s + d.calories, 0) / filtered.length);
+                const avgPro = Math.round(filtered.reduce((s, d) => s + d.protein, 0) / filtered.length);
+                const avgCarb = Math.round(filtered.reduce((s, d) => s + d.carbs, 0) / filtered.length);
+                const avgFat = Math.round(filtered.reduce((s, d) => s + d.fat, 0) / filtered.length);
+                
+                document.getElementById('avgCalories').textContent = avgCal.toLocaleString();
+                document.getElementById('avgProtein').textContent = avgPro + 'g';
+                document.getElementById('avgCarbs').textContent = avgCarb + 'g';
+                document.getElementById('avgFat').textContent = avgFat + 'g';
+                document.getElementById('daysLogged').textContent = filtered.length;
+            }
+            
+            // Macro stacked chart
+            const labels = data.map(d => d.date);
+            const datasets = [];
+            
+            if (showMacros.protein) {
+                datasets.push({
+                    label: 'Protein',
+                    data: data.map(d => d.protein),
+                    backgroundColor: '#4ade80',
+                    stack: 'macros',
+                    order: 2
+                });
+            }
+            if (showMacros.carbs) {
+                datasets.push({
+                    label: 'Carbs',
+                    data: data.map(d => d.carbs),
+                    backgroundColor: '#60a5fa',
+                    stack: 'macros',
+                    order: 2
+                });
+            }
+            if (showMacros.fat) {
+                datasets.push({
+                    label: 'Fat',
+                    data: data.map(d => d.fat),
+                    backgroundColor: '#fbbf24',
+                    stack: 'macros',
+                    order: 2
+                });
+            }
+            
+            // Add weight line overlay if data exists and toggle is on
+            if (weightData.length > 0 && showMacros.weight) {
+                const weightByDate = {};
+                weightData.forEach(w => weightByDate[w.date] = w.weight);
+                
+                // Interpolate weight for dates in range
+                const weightLine = labels.map(date => {
+                    if (weightByDate[date]) return weightByDate[date];
+                    // Find closest weight entry
+                    const sorted = weightData.filter(w => w.date <= date).sort((a,b) => b.date.localeCompare(a.date));
+                    return sorted[0]?.weight || null;
+                });
+                
+                datasets.push({
+                    label: 'Weight (lbs)',
+                    data: weightLine,
+                    type: 'line',
+                    borderColor: '#f472b6',
+                    backgroundColor: 'transparent',
+                    borderWidth: 3,
+                    pointRadius: 2,
+                    yAxisID: 'yWeight',
+                    tension: 0.3,
+                    order: 0  // Draw on top of bars
+                });
+            }
+            
+            if (macroChart) macroChart.destroy();
+            macroChart = new Chart(document.getElementById('macroChart'), {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true, ticks: { color: '#aaa' }, grid: { color: '#333' } },
+                        y: { 
+                            stacked: true, 
+                            ticks: { color: '#aaa' }, 
+                            grid: { color: '#333' },
+                            title: { display: true, text: 'Grams', color: '#aaa' }
+                        },
+                        yWeight: {
+                            position: 'right',
+                            min: 140,
+                            max: 160,
+                            ticks: { color: '#f472b6' },
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Weight (lbs)', color: '#f472b6' },
+                            display: weightData.length > 0 && showMacros.weight
+                        }
+                    },
+                    plugins: { legend: { labels: { color: '#eee' } } }
+                }
+            });
+            
+            // Trend chart (calories + protein)
+            if (trendChart) trendChart.destroy();
+            trendChart = new Chart(document.getElementById('trendChart'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Calories',
+                            data: data.map(d => d.calories),
+                            borderColor: '#e94560',
+                            backgroundColor: 'rgba(233, 69, 96, 0.1)',
+                            fill: true,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Protein (g)',
+                            data: data.map(d => d.protein),
+                            borderColor: '#4ade80',
+                            backgroundColor: 'transparent',
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#aaa' }, grid: { color: '#333' } },
+                        y: { 
+                            type: 'linear', 
+                            position: 'left', 
+                            ticks: { color: '#e94560' }, 
+                            grid: { color: '#333' },
+                            title: { display: true, text: 'Calories', color: '#e94560' }
+                        },
+                        y1: { 
+                            type: 'linear', 
+                            position: 'right', 
+                            ticks: { color: '#4ade80' }, 
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Protein (g)', color: '#4ade80' }
+                        }
+                    },
+                    plugins: { legend: { labels: { color: '#eee' } } }
+                }
+            });
+        }
+        
+        // Resize handle functionality
+        function initResizeHandles() {
+            document.querySelectorAll('.resize-handle').forEach(handle => {
+                let startY, startHeight, wrapper;
+                
+                const onMove = (e) => {
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    const delta = clientY - startY;
+                    const newHeight = Math.min(600, Math.max(150, startHeight + delta));
+                    wrapper.style.height = newHeight + 'px';
+                };
+                
+                const onEnd = () => {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onEnd);
+                    document.removeEventListener('touchmove', onMove);
+                    document.removeEventListener('touchend', onEnd);
+                    // Trigger chart resize
+                    if (macroChart) macroChart.resize();
+                    if (trendChart) trendChart.resize();
+                };
+                
+                const onStart = (e) => {
+                    e.preventDefault();
+                    wrapper = document.getElementById(handle.dataset.target);
+                    startY = e.touches ? e.touches[0].clientY : e.clientY;
+                    startHeight = wrapper.offsetHeight;
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onEnd);
+                    document.addEventListener('touchmove', onMove, { passive: false });
+                    document.addEventListener('touchend', onEnd);
+                };
+                
+                handle.addEventListener('mousedown', onStart);
+                handle.addEventListener('touchstart', onStart, { passive: false });
+            });
+        }
+        
+        // Initialize
+        (async () => {
+            const authed = await checkAuth();
+            if (!authed) return; // Login form shown
+            
+            await loadWeightData();
+            await loadData();
+            initResizeHandles();
+        })();
+    </script>
+</body>
+</html>
