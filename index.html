@@ -443,6 +443,16 @@
             }
         }
         
+        // Check if question is an aggregation/count query
+        function isAggregationQuery(q) {
+            const patterns = [
+                /how many/i, /how much/i, /count/i, /total/i, /sum/i,
+                /average/i, /avg/i, /times did/i, /days did/i,
+                /frequency/i, /often/i, /number of/i
+            ];
+            return patterns.some(p => p.test(q));
+        }
+        
         // Ask Henry chat function
         async function askHenry() {
             const input = document.getElementById('chatInput');
@@ -452,6 +462,39 @@
             if (!question) return;
             
             response.classList.add('visible');
+            
+            // Route aggregation queries to SQL endpoint
+            if (isAggregationQuery(question)) {
+                response.innerHTML = '<span class="chat-loading">🔢 Running SQL query...</span>';
+                
+                try {
+                    const res = await fetch('/api/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                        body: JSON.stringify({ question })
+                    });
+                    
+                    if (res.ok) {
+                        const data = await res.json();
+                        let display = data.answer;
+                        if (data.sql) {
+                            display += '\n\n📊 SQL: ' + data.sql;
+                        }
+                        if (data.executionTimeMs) {
+                            display += '\n⚡ ' + data.executionTimeMs + 'ms';
+                        }
+                        response.textContent = display;
+                    } else {
+                        const err = await res.json();
+                        response.textContent = 'Query failed: ' + (err.message || err.error);
+                    }
+                } catch (e) {
+                    response.textContent = 'SQL Query API not available: ' + e.message;
+                }
+                return;
+            }
+            
+            // Non-aggregation: use existing LLM approach
             response.innerHTML = '<span class="chat-loading">Henry is analyzing your data...</span>';
             
             // Prepare context about the current data

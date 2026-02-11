@@ -6,6 +6,7 @@
     "dev": "vercel dev"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "pg": "^8.11.0"
   }
 }
