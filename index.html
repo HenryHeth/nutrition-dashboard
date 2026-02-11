@@ -131,6 +131,8 @@
             color: var(--text);
             white-space: pre-wrap;
             display: none;
+            max-height: 400px;
+            overflow-y: auto;
         }
         .chat-response.visible { display: block; }
         .detail-level {
@@ -277,6 +279,11 @@
                 <option value="365" selected>Last year</option>
                 <option value="all">All time</option>
             </select>
+        </div>
+        <div class="control-group">
+            <label>Data</label>
+            <button id="refreshBtn" onclick="refreshData()" title="Reload data from database">🔄 Refresh</button>
+            <div id="lastUpdated" style="font-size: 0.7rem; color: #888; margin-top: 0.25rem;"></div>
         </div>
     </div>
     
@@ -507,9 +514,30 @@
                 allData.sort((a, b) => a.date.localeCompare(b.date));
                 initControls();
                 updateCharts();
+                updateLastUpdated();
             } catch (e) {
                 console.error('Failed to load data:', e);
                 document.body.innerHTML = '<div class="loading">Failed to load data. Check API connection.</div>';
+            }
+        }
+        
+        function updateLastUpdated() {
+            const el = document.getElementById('lastUpdated');
+            if (el) {
+                const now = new Date();
+                el.textContent = 'Updated: ' + now.toLocaleTimeString();
+            }
+        }
+        
+        async function refreshData() {
+            const btn = document.getElementById('refreshBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Loading...';
+            try {
+                await loadData();
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 Refresh';
             }
         }
         
