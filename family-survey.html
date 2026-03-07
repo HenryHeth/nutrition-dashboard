@@ -257,6 +257,48 @@
             <input type="text" id="q_sides_other" placeholder="e.g. Hummus, edamame, kimchi...">
         </div>
 
+        <!-- Section 4b: Cuisines -->
+        <div class="section">
+            <h2>🌍 Cuisines — Tap all you enjoy</h2>
+            <div class="options" id="cuisines">
+                <button class="option-btn" onclick="toggle(this)">Italian</button>
+                <button class="option-btn" onclick="toggle(this)">Mexican</button>
+                <button class="option-btn" onclick="toggle(this)">Chinese</button>
+                <button class="option-btn" onclick="toggle(this)">Japanese</button>
+                <button class="option-btn" onclick="toggle(this)">Thai</button>
+                <button class="option-btn" onclick="toggle(this)">Indian</button>
+                <button class="option-btn" onclick="toggle(this)">Greek</button>
+                <button class="option-btn" onclick="toggle(this)">Mediterranean</button>
+                <button class="option-btn" onclick="toggle(this)">Korean</button>
+                <button class="option-btn" onclick="toggle(this)">Vietnamese</button>
+                <button class="option-btn" onclick="toggle(this)">French</button>
+                <button class="option-btn" onclick="toggle(this)">Middle Eastern</button>
+                <button class="option-btn" onclick="toggle(this)">Canadian/American</button>
+                <button class="option-btn" onclick="toggle(this)">Irish/British</button>
+            </div>
+            <div class="hint" style="margin-top:0.5rem">Other cuisines?</div>
+            <input type="text" id="q_cuisines_other" placeholder="e.g. Ethiopian, Peruvian...">
+        </div>
+
+        <!-- Section 4c: Flavour Profiles -->
+        <div class="section">
+            <h2>🌶️ Flavours — What do you gravitate towards?</h2>
+            <div class="options" id="flavours">
+                <button class="option-btn" onclick="toggle(this)">Spicy</button>
+                <button class="option-btn" onclick="toggle(this)">Mild</button>
+                <button class="option-btn" onclick="toggle(this)">Savoury</button>
+                <button class="option-btn" onclick="toggle(this)">Sweet & savoury</button>
+                <button class="option-btn" onclick="toggle(this)">Tangy/sour</button>
+                <button class="option-btn" onclick="toggle(this)">Smoky</button>
+                <button class="option-btn" onclick="toggle(this)">Herby/fresh</button>
+                <button class="option-btn" onclick="toggle(this)">Garlic-heavy</button>
+                <button class="option-btn" onclick="toggle(this)">Creamy/rich</button>
+                <button class="option-btn" onclick="toggle(this)">Light/clean</button>
+                <button class="option-btn" onclick="toggle(this)">Salt & vinegar</button>
+                <button class="option-btn" onclick="toggle(this)">Umami</button>
+            </div>
+        </div>
+
         <!-- Section 5: Breakfast & Snacks -->
         <div class="section">
             <h2>🌅 Breakfast & Snacks</h2>
@@ -398,6 +440,9 @@
                 proteinsOther: document.getElementById('q_proteins_other').value,
                 mealsOther: document.getElementById('q_meals_other').value,
                 sidesOther: document.getElementById('q_sides_other').value,
+                cuisines: getSelected('cuisines'),
+                cuisinesOther: document.getElementById('q_cuisines_other').value,
+                flavours: getSelected('flavours'),
                 smoothie: getSingle('smoothie'),
                 snacks: document.getElementById('q_snacks').value,
                 cookTime: getSingle('cooktime'),
@@ -447,6 +492,8 @@
                 if (d.proteins?.length) txt += `Proteins: ${d.proteins.join(', ')}${d.proteinsOther ? ' + ' + d.proteinsOther : ''}\n`;
                 if (d.mealTypes?.length) txt += `Meal types: ${d.mealTypes.join(', ')}${d.mealsOther ? ' + ' + d.mealsOther : ''}\n`;
                 if (d.sides?.length) txt += `Sides: ${d.sides.join(', ')}${d.sidesOther ? ' + ' + d.sidesOther : ''}\n`;
+                if (d.cuisines?.length) txt += `Cuisines: ${d.cuisines.join(', ')}${d.cuisinesOther ? ' + ' + d.cuisinesOther : ''}\n`;
+                if (d.flavours?.length) txt += `Flavours: ${d.flavours.join(', ')}\n`;
                 if (d.smoothie) txt += `Smoothies: ${d.smoothie}\n`;
                 if (d.snacks) txt += `Snacks: ${d.snacks}\n`;
                 if (d.cookTime) txt += `Cook time: ${d.cookTime}\n`;
