@@ -323,6 +323,7 @@
         <span id="othersRemaining"></span>
         <br><br>
         <button class="person-btn" onclick="location.reload()" style="margin-top:1rem">Fill in for someone else</button>
+        <button id="shareBtn" class="submit-btn hidden" style="margin-top:1rem" onclick="shareResults()">📋 Copy All Results for Paul</button>
     </div>
 
     <script>
@@ -396,37 +397,67 @@
                 notes: document.getElementById('q_notes').value
             };
             
-            // Submit to API
-            const submitBtn = document.querySelector('.submit-btn');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Saving...';
+            allData[currentPerson] = data;
+            localStorage.setItem('foodPrefs', JSON.stringify(allData));
             
+            // Try API save (silently — works if DB is configured)
             try {
-                const resp = await fetch('/api/food-preferences', {
+                fetch('/api/food-preferences', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
+                }).catch(() => {});
+            } catch(e) {}
+            
+            // Show done message
+            document.getElementById('formArea').classList.add('hidden');
+            document.getElementById('doneMsg').classList.remove('hidden');
+            document.getElementById('doneName').textContent = currentPerson.charAt(0).toUpperCase() + currentPerson.slice(1);
+            
+            const filled = Object.keys(allData);
+            const remaining = ['Jen', 'Ailie', 'Parker'].filter(n => !filled.includes(n.toLowerCase()));
+            const remainText = remaining.length > 0 
+                ? `Still need: ${remaining.join(', ')}` 
+                : 'Everyone\'s done! 🎉';
+            document.getElementById('othersRemaining').textContent = remainText;
+            
+            // Show share button if all done
+            if (remaining.length === 0) {
+                document.getElementById('shareBtn').classList.remove('hidden');
+            }
+        }
+
+        function shareResults() {
+            const all = JSON.parse(localStorage.getItem('foodPrefs') || '{}');
+            let txt = '🥗 FAMILY FOOD PREFERENCES\n\n';
+            for (const [name, d] of Object.entries(all)) {
+                txt += `=== ${name.toUpperCase()} ===\n`;
+                if (d.top3) txt += `Top 3 dinners: ${d.top3}\n`;
+                if (d.hatefoods) txt += `Won't eat: ${d.hatefoods}\n`;
+                if (d.proteins?.length) txt += `Proteins: ${d.proteins.join(', ')}\n`;
+                if (d.mealTypes?.length) txt += `Meal types: ${d.mealTypes.join(', ')}\n`;
+                if (d.sides?.length) txt += `Sides: ${d.sides.join(', ')}\n`;
+                if (d.smoothie) txt += `Smoothies: ${d.smoothie}\n`;
+                if (d.snacks) txt += `Snacks: ${d.snacks}\n`;
+                if (d.cookTime) txt += `Cook time: ${d.cookTime}\n`;
+                if (d.batchCook) txt += `Batch cook: ${d.batchCook}\n`;
+                if (d.repeats) txt += `Repeat meals: ${d.repeats}\n`;
+                if (d.wishmore) txt += `Wish more: ${d.wishmore}\n`;
+                if (d.notes) txt += `Notes: ${d.notes}\n`;
+                txt += '\n';
+            }
+            
+            if (navigator.share) {
+                navigator.share({ title: 'Food Preferences', text: txt }).catch(() => {
+                    navigator.clipboard.writeText(txt);
+                    alert('Copied to clipboard! Paste it to Paul.');
                 });
-                
-                if (!resp.ok) throw new Error('Save failed');
-                
-                allData[currentPerson] = data;
-                localStorage.setItem('foodPrefs', JSON.stringify(allData));
-                
-                // Show done message
-                document.getElementById('formArea').classList.add('hidden');
-                document.getElementById('doneMsg').classList.remove('hidden');
-                document.getElementById('doneName').textContent = currentPerson.charAt(0).toUpperCase() + currentPerson.slice(1);
-                
-                const filled = Object.keys(allData);
-                const remaining = ['Jen', 'Ailie', 'Parker'].filter(n => !filled.includes(n.toLowerCase()));
-                document.getElementById('othersRemaining').textContent = remaining.length > 0 
-                    ? `Still need: ${remaining.join(', ')}` 
-                    : 'Everyone\'s done! 🎉';
-            } catch (err) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = '❌ Error — tap to retry';
-                console.error(err);
+            } else {
+                navigator.clipboard.writeText(txt).then(() => {
+                    alert('Copied to clipboard! Paste it to Paul.');
+                }).catch(() => {
+                    prompt('Copy this text:', txt);
+                });
             }
         }
 
