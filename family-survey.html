@@ -207,6 +207,8 @@
                 <button class="option-btn" onclick="toggle(this)">Sausage</button>
                 <button class="option-btn" onclick="toggle(this)">Bacon</button>
             </div>
+            <div class="hint" style="margin-top:0.5rem">Other proteins?</div>
+            <input type="text" id="q_proteins_other" placeholder="e.g. Bison, duck, tempeh...">
         </div>
 
         <!-- Section 3: Meal Types -->
@@ -230,6 +232,8 @@
                 <button class="option-btn" onclick="toggle(this)">Sheet pan meals</button>
                 <button class="option-btn" onclick="toggle(this)">Slow cooker</button>
             </div>
+            <div class="hint" style="margin-top:0.5rem">Other meal types?</div>
+            <input type="text" id="q_meals_other" placeholder="e.g. Sushi bowls, charcuterie...">
         </div>
 
         <!-- Section 4: Sides & Carbs -->
@@ -249,6 +253,8 @@
                 <button class="option-btn" onclick="toggle(this)">Roast veggies</button>
                 <button class="option-btn" onclick="toggle(this)">Coleslaw</button>
             </div>
+            <div class="hint" style="margin-top:0.5rem">Other sides?</div>
+            <input type="text" id="q_sides_other" placeholder="e.g. Hummus, edamame, kimchi...">
         </div>
 
         <!-- Section 5: Breakfast & Snacks -->
@@ -389,6 +395,9 @@
                 proteins: getSelected('proteins'),
                 mealTypes: getSelected('mealtypes'),
                 sides: getSelected('sides'),
+                proteinsOther: document.getElementById('q_proteins_other').value,
+                mealsOther: document.getElementById('q_meals_other').value,
+                sidesOther: document.getElementById('q_sides_other').value,
                 smoothie: getSingle('smoothie'),
                 snacks: document.getElementById('q_snacks').value,
                 cookTime: getSingle('cooktime'),
@@ -435,9 +444,9 @@
                 txt += `=== ${name.toUpperCase()} ===\n`;
                 if (d.top3) txt += `Top 3 dinners: ${d.top3}\n`;
                 if (d.hatefoods) txt += `Won't eat: ${d.hatefoods}\n`;
-                if (d.proteins?.length) txt += `Proteins: ${d.proteins.join(', ')}\n`;
-                if (d.mealTypes?.length) txt += `Meal types: ${d.mealTypes.join(', ')}\n`;
-                if (d.sides?.length) txt += `Sides: ${d.sides.join(', ')}\n`;
+                if (d.proteins?.length) txt += `Proteins: ${d.proteins.join(', ')}${d.proteinsOther ? ' + ' + d.proteinsOther : ''}\n`;
+                if (d.mealTypes?.length) txt += `Meal types: ${d.mealTypes.join(', ')}${d.mealsOther ? ' + ' + d.mealsOther : ''}\n`;
+                if (d.sides?.length) txt += `Sides: ${d.sides.join(', ')}${d.sidesOther ? ' + ' + d.sidesOther : ''}\n`;
                 if (d.smoothie) txt += `Smoothies: ${d.smoothie}\n`;
                 if (d.snacks) txt += `Snacks: ${d.snacks}\n`;
                 if (d.cookTime) txt += `Cook time: ${d.cookTime}\n`;
