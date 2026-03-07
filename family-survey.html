@@ -388,6 +388,16 @@
             </div>
         </div>
 
+        <!-- Section 6b: Dream Meal -->
+        <div class="section">
+            <h2>⭐ Dream Meal</h2>
+            <div class="question">
+                <label>What's your all-time favourite meal? Describe it and we'll try to build it!</label>
+                <div class="hint">Any meal — restaurant, homemade, grandma's recipe, something you had on holiday. Go wild.</div>
+                <textarea id="q_dreammeal" placeholder="e.g. A perfect pad thai with crispy tofu, or mom's lasagna with garlic bread..."></textarea>
+            </div>
+        </div>
+
         <!-- Section 7: Anything else -->
         <div class="section">
             <h2>💬 Anything else?</h2>
@@ -477,6 +487,7 @@
                 flavours: getSelected('flavours'),
                 spices: getSelected('spices'),
                 spicesOther: document.getElementById('q_spices_other').value,
+                dreamMeal: document.getElementById('q_dreammeal').value,
                 smoothie: getSingle('smoothie'),
                 snacks: document.getElementById('q_snacks').value,
                 cookTime: getSingle('cooktime'),
@@ -529,6 +540,7 @@
                 if (d.cuisines?.length) txt += `Cuisines: ${d.cuisines.join(', ')}${d.cuisinesOther ? ' + ' + d.cuisinesOther : ''}\n`;
                 if (d.flavours?.length) txt += `Flavours: ${d.flavours.join(', ')}\n`;
                 if (d.spices?.length) txt += `Spices: ${d.spices.join(', ')}${d.spicesOther ? ' + ' + d.spicesOther : ''}\n`;
+                if (d.dreamMeal) txt += `Dream meal: ${d.dreamMeal}\n`;
                 if (d.smoothie) txt += `Smoothies: ${d.smoothie}\n`;
                 if (d.snacks) txt += `Snacks: ${d.snacks}\n`;
                 if (d.cookTime) txt += `Cook time: ${d.cookTime}\n`;
