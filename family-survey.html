@@ -299,6 +299,38 @@
             </div>
         </div>
 
+        <!-- Section 4d: Spices & Flavourings -->
+        <div class="section">
+            <h2>🧂 Spices & Flavourings — Tap the ones you like</h2>
+            <div class="hint">Skip the ones you don't care for</div>
+            <div class="options" id="spices">
+                <button class="option-btn" onclick="toggle(this)">Garlic</button>
+                <button class="option-btn" onclick="toggle(this)">Ginger</button>
+                <button class="option-btn" onclick="toggle(this)">Cumin</button>
+                <button class="option-btn" onclick="toggle(this)">Cinnamon</button>
+                <button class="option-btn" onclick="toggle(this)">Chili flakes</button>
+                <button class="option-btn" onclick="toggle(this)">Curry powder</button>
+                <button class="option-btn" onclick="toggle(this)">Turmeric</button>
+                <button class="option-btn" onclick="toggle(this)">Paprika</button>
+                <button class="option-btn" onclick="toggle(this)">Oregano</button>
+                <button class="option-btn" onclick="toggle(this)">Basil</button>
+                <button class="option-btn" onclick="toggle(this)">Rosemary</button>
+                <button class="option-btn" onclick="toggle(this)">Thyme</button>
+                <button class="option-btn" onclick="toggle(this)">Cilantro</button>
+                <button class="option-btn" onclick="toggle(this)">Soy sauce</button>
+                <button class="option-btn" onclick="toggle(this)">Sriracha</button>
+                <button class="option-btn" onclick="toggle(this)">Lemon/Lime</button>
+                <button class="option-btn" onclick="toggle(this)">Mustard</button>
+                <button class="option-btn" onclick="toggle(this)">Pesto</button>
+                <button class="option-btn" onclick="toggle(this)">Hot sauce</button>
+                <button class="option-btn" onclick="toggle(this)">BBQ sauce</button>
+                <button class="option-btn" onclick="toggle(this)">Teriyaki</button>
+                <button class="option-btn" onclick="toggle(this)">Salsa</button>
+            </div>
+            <div class="hint" style="margin-top:0.5rem">Other favourites?</div>
+            <input type="text" id="q_spices_other" placeholder="e.g. Za'atar, fish sauce, miso...">
+        </div>
+
         <!-- Section 5: Breakfast & Snacks -->
         <div class="section">
             <h2>🌅 Breakfast & Snacks</h2>
@@ -443,6 +475,8 @@
                 cuisines: getSelected('cuisines'),
                 cuisinesOther: document.getElementById('q_cuisines_other').value,
                 flavours: getSelected('flavours'),
+                spices: getSelected('spices'),
+                spicesOther: document.getElementById('q_spices_other').value,
                 smoothie: getSingle('smoothie'),
                 snacks: document.getElementById('q_snacks').value,
                 cookTime: getSingle('cooktime'),
@@ -494,6 +528,7 @@
                 if (d.sides?.length) txt += `Sides: ${d.sides.join(', ')}${d.sidesOther ? ' + ' + d.sidesOther : ''}\n`;
                 if (d.cuisines?.length) txt += `Cuisines: ${d.cuisines.join(', ')}${d.cuisinesOther ? ' + ' + d.cuisinesOther : ''}\n`;
                 if (d.flavours?.length) txt += `Flavours: ${d.flavours.join(', ')}\n`;
+                if (d.spices?.length) txt += `Spices: ${d.spices.join(', ')}${d.spicesOther ? ' + ' + d.spicesOther : ''}\n`;
                 if (d.smoothie) txt += `Smoothies: ${d.smoothie}\n`;
                 if (d.snacks) txt += `Snacks: ${d.snacks}\n`;
                 if (d.cookTime) txt += `Cook time: ${d.cookTime}\n`;
