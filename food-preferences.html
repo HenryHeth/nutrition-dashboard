@@ -378,7 +378,7 @@
             return sel ? sel.textContent.trim() : '';
         }
         
-        function submitForm() {
+        async function submitForm() {
             const data = {
                 person: currentPerson,
                 timestamp: new Date().toISOString(),
@@ -396,23 +396,38 @@
                 notes: document.getElementById('q_notes').value
             };
             
-            allData[currentPerson] = data;
-            localStorage.setItem('foodPrefs', JSON.stringify(allData));
+            // Submit to API
+            const submitBtn = document.querySelector('.submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
             
-            // Show done message
-            document.getElementById('formArea').classList.add('hidden');
-            document.getElementById('doneMsg').classList.remove('hidden');
-            document.getElementById('doneName').textContent = currentPerson.charAt(0).toUpperCase() + currentPerson.slice(1);
-            
-            const filled = Object.keys(allData);
-            const remaining = ['Jen', 'Ailie', 'Parker'].filter(n => !filled.includes(n.toLowerCase()));
-            document.getElementById('othersRemaining').textContent = remaining.length > 0 
-                ? `Still need: ${remaining.join(', ')}` 
-                : 'Everyone\'s done! Show Paul the results.';
-            
-            // Also create a copyable summary
-            console.log('=== FOOD PREFERENCES ===');
-            console.log(JSON.stringify(allData, null, 2));
+            try {
+                const resp = await fetch('/api/food-preferences', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!resp.ok) throw new Error('Save failed');
+                
+                allData[currentPerson] = data;
+                localStorage.setItem('foodPrefs', JSON.stringify(allData));
+                
+                // Show done message
+                document.getElementById('formArea').classList.add('hidden');
+                document.getElementById('doneMsg').classList.remove('hidden');
+                document.getElementById('doneName').textContent = currentPerson.charAt(0).toUpperCase() + currentPerson.slice(1);
+                
+                const filled = Object.keys(allData);
+                const remaining = ['Jen', 'Ailie', 'Parker'].filter(n => !filled.includes(n.toLowerCase()));
+                document.getElementById('othersRemaining').textContent = remaining.length > 0 
+                    ? `Still need: ${remaining.join(', ')}` 
+                    : 'Everyone\'s done! 🎉';
+            } catch (err) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '❌ Error — tap to retry';
+                console.error(err);
+            }
         }
 
         // Check who's already done
