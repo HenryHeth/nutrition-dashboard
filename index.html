@@ -367,7 +367,15 @@
         </div>
         <div class="resize-handle" data-target="macroChartWrapper"></div>
     </div>
-    
+
+    <div class="chart-container resizable">
+        <div class="chart-title">DOMS vs Training Volume <span style="color:#888;font-weight:400;font-size:0.85rem;">— ceiling check (spec §4c)</span></div>
+        <div class="chart-wrapper" id="domsVolumeWrapper">
+            <canvas id="domsVolumeChart"></canvas>
+        </div>
+        <div class="resize-handle" data-target="domsVolumeWrapper"></div>
+    </div>
+
     <div class="chat-container">
         <div class="chat-header">
             <span>🤖</span>
@@ -399,7 +407,8 @@
         let allData = [];
         let weightData = [];
         let overlayData = [];   // [{date, sleep_hours, ctl, atl, tsb, restedness_am, doms_am}]
-        let macroChart, trendChart;
+        let trainingVolumeData = [];  // [{date, volume_lbs, doms_am}]
+        let macroChart, trendChart, domsVolumeChart;
         let showMacros = { protein: true, carbs: true, fat: true, weight: true };
         // Spec §4b — extra line overlays. Default OFF; user toggles to reveal correlations.
         const OVERLAY_DEFS = [
@@ -515,6 +524,20 @@
                 }
             } catch (e) {
                 console.log('Overlay endpoint not yet available — main chart will skip overlays');
+            }
+        }
+
+        // Load daily training volume + DOMS — spec §4c
+        async function loadTrainingVolumeData() {
+            try {
+                const res = await fetch('/api/training-volume', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    trainingVolumeData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
+                    console.log(`Loaded ${trainingVolumeData.length} training-volume rows`);
+                }
+            } catch (e) {
+                console.log('Training-volume endpoint not yet available');
             }
         }
         
@@ -912,6 +935,63 @@
                 }
             });
             
+            // DOMS vs Volume chart (spec §4c) — filtered to current date range
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const tv = trainingVolumeData.filter(d => d.date >= start && d.date <= end);
+            const tvLabels = tv.map(d => d.date);
+            if (domsVolumeChart) domsVolumeChart.destroy();
+            domsVolumeChart = new Chart(document.getElementById('domsVolumeChart'), {
+                type: 'bar',
+                data: {
+                    labels: tvLabels,
+                    datasets: [
+                        {
+                            label: 'Volume (lbs lifted)',
+                            data: tv.map(d => d.volume_lbs),
+                            backgroundColor: '#888',
+                            yAxisID: 'yVol',
+                            order: 2
+                        },
+                        {
+                            label: 'DOMS (AM, 0–5)',
+                            data: tv.map(d => d.doms_am),
+                            type: 'line',
+                            borderColor: '#f97316',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            pointRadius: 2,
+                            spanGaps: true,
+                            tension: 0.3,
+                            yAxisID: 'yDoms',
+                            order: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#aaa' }, grid: { color: '#333' } },
+                        yVol: {
+                            position: 'left',
+                            beginAtZero: true,
+                            ticks: { color: '#aaa' },
+                            grid: { color: '#333' },
+                            title: { display: true, text: 'Volume (lbs)', color: '#aaa' }
+                        },
+                        yDoms: {
+                            position: 'right',
+                            min: 0, max: 5,
+                            ticks: { color: '#f97316', stepSize: 1 },
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'DOMS (0–5)', color: '#f97316' }
+                        }
+                    },
+                    plugins: { legend: { labels: { color: '#eee' } } }
+                }
+            });
+
             // Trend chart (calories + protein)
             if (trendChart) trendChart.destroy();
             trendChart = new Chart(document.getElementById('trendChart'), {
@@ -978,9 +1058,9 @@
                     document.removeEventListener('mouseup', onEnd);
                     document.removeEventListener('touchmove', onMove);
                     document.removeEventListener('touchend', onEnd);
-                    // Trigger chart resize
                     if (macroChart) macroChart.resize();
                     if (trendChart) trendChart.resize();
+                    if (domsVolumeChart) domsVolumeChart.resize();
                 };
                 
                 const onStart = (e) => {
@@ -1004,7 +1084,7 @@
             const authed = await checkAuth();
             if (!authed) return; // Login form shown
 
-            await Promise.all([loadWeightData(), loadOverlayData()]);
+            await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData()]);
             await loadData();
             initResizeHandles();
         })();
