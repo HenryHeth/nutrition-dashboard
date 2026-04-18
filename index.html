@@ -163,6 +163,30 @@
         .mood-cell[data-v="3"] { background: #8a7a1f; }
         .mood-cell[data-v="4"] { background: #3d8a3a; }
         .mood-cell[data-v="5"] { background: #4ade80; }
+        .habit-grid {
+            display: grid;
+            grid-template-columns: 130px 1fr;
+            gap: 0.5rem;
+            padding: 0.75rem;
+        }
+        .habit-row-label {
+            font-size: 0.85rem;
+            color: #ccc;
+            display: flex;
+            align-items: center;
+        }
+        .habit-row-cells {
+            display: grid;
+            grid-template-columns: repeat(60, 1fr);
+            gap: 2px;
+        }
+        .habit-cell {
+            aspect-ratio: 1;
+            border-radius: 2px;
+            background: #2a2a3a;
+        }
+        .habit-cell.hit  { background: #4ade80; }
+        .habit-cell.miss { background: #ef4444; }
         .checkbox-label {
             display: flex;
             align-items: center;
@@ -417,6 +441,12 @@
         <div class="resize-handle" data-target="domsVolumeWrapper"></div>
     </div>
 
+    <!-- Habit compliance grid — spec §4g -->
+    <div class="chart-container">
+        <div class="chart-title">Habit Compliance — last 60 days <span class="sub">spec §4g</span></div>
+        <div id="habitGrid" class="habit-grid"></div>
+    </div>
+
     <!-- Body composition — spec §4e -->
     <div class="chart-container resizable">
         <div class="chart-title">Body Composition <span class="sub">lean mass + BF% trend (spec §4e)</span></div>
@@ -631,6 +661,34 @@
             } catch (e) {
                 console.log('Training-volume endpoint not yet available');
             }
+        }
+
+        // Load habit compliance (last 60 days) — spec §4g
+        async function loadHabits() {
+            try {
+                const res = await fetch('/api/habits?days=60', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    renderHabitGrid(json.dates || [], json.rows || []);
+                }
+            } catch (e) {
+                console.log('Habits endpoint not yet available');
+            }
+        }
+
+        function renderHabitGrid(dates, rows) {
+            const grid = document.getElementById('habitGrid');
+            if (!grid) return;
+            grid.innerHTML = rows.map(row => `
+                <div class="habit-row-label">${row.label}</div>
+                <div class="habit-row-cells">
+                    ${row.hits.map((s, i) => {
+                        const cls = s === 'hit' ? 'hit' : s === 'miss' ? 'miss' : '';
+                        const tip = `${dates[i]}: ${s.replace('_', ' ')}`;
+                        return `<div class="habit-cell ${cls}" title="${tip}"></div>`;
+                    }).join('')}
+                </div>
+            `).join('');
         }
 
         // Load body composition (sparse) — spec §4e
@@ -1380,7 +1438,7 @@
             const authed = await checkAuth();
             if (!authed) return; // Login form shown
 
-            await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData(), loadCheckinData(), loadWeeklyVolumeData(), loadBodyCompData()]);
+            await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData(), loadCheckinData(), loadWeeklyVolumeData(), loadBodyCompData(), loadHabits()]);
             await loadData();
             initResizeHandles();
         })();
