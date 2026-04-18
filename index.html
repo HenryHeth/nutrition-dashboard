@@ -417,6 +417,15 @@
         <div class="resize-handle" data-target="domsVolumeWrapper"></div>
     </div>
 
+    <!-- Weekly gym volume — spec §4f -->
+    <div class="chart-container resizable">
+        <div class="chart-title">Weekly Gym Volume <span class="sub">progressive overload — spec §4f</span></div>
+        <div class="chart-wrapper" id="weeklyVolumeWrapper">
+            <canvas id="weeklyVolumeChart"></canvas>
+        </div>
+        <div class="resize-handle" data-target="weeklyVolumeWrapper"></div>
+    </div>
+
     <!-- SignalCheck subjective overlays — spec §4d -->
     <div class="section-title">SignalCheck — Subjective Wellbeing</div>
     <div class="signal-grid">
@@ -479,7 +488,8 @@
         let overlayData = [];   // [{date, sleep_hours, ctl, atl, tsb, restedness_am, doms_am}]
         let trainingVolumeData = [];  // [{date, volume_lbs, doms_am}]
         let checkinData = [];  // [{date, restedness_am/pm, mood_am/pm, ..., sleep_score}]
-        let macroChart, trendChart, domsVolumeChart;
+        let weeklyVolumeData = [];  // [{week_start, upper_push, upper_pull, lower, core, other, total}]
+        let macroChart, trendChart, domsVolumeChart, weeklyVolumeChart;
         let restednessChart, hungerChart, backChart, generalHealthChart, restednessDeltaChart;
         let showMacros = { protein: true, carbs: true, fat: true, weight: true };
         // Spec §4b — extra line overlays. Default OFF; user toggles to reveal correlations.
@@ -611,6 +621,51 @@
             } catch (e) {
                 console.log('Training-volume endpoint not yet available');
             }
+        }
+
+        // Load weekly gym volume (per category) — spec §4f
+        async function loadWeeklyVolumeData() {
+            try {
+                const res = await fetch('/api/weekly-volume', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    weeklyVolumeData = (json.data || []).slice().sort((a,b) => a.week_start.localeCompare(b.week_start));
+                    console.log(`Loaded ${weeklyVolumeData.length} weekly-volume rows`);
+                }
+            } catch (e) {
+                console.log('Weekly-volume endpoint not yet available');
+            }
+        }
+
+        function renderWeeklyVolumeChart() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const wv = weeklyVolumeData.filter(d => d.week_start >= start && d.week_start <= end);
+            const labels = wv.map(d => d.week_start);
+
+            if (weeklyVolumeChart) weeklyVolumeChart.destroy();
+            weeklyVolumeChart = new Chart(document.getElementById('weeklyVolumeChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Upper Push', data: wv.map(d => d.upper_push), backgroundColor: '#60a5fa', stack: 'cat', order: 2 },
+                        { label: 'Upper Pull', data: wv.map(d => d.upper_pull), backgroundColor: '#a855f7', stack: 'cat', order: 2 },
+                        { label: 'Lower',      data: wv.map(d => d.lower),      backgroundColor: '#4ade80', stack: 'cat', order: 2 },
+                        { label: 'Core',       data: wv.map(d => d.core),       backgroundColor: '#fbbf24', stack: 'cat', order: 2 },
+                        { label: 'Other',      data: wv.map(d => d.other),      backgroundColor: '#666',    stack: 'cat', order: 2 },
+                        { label: 'Total trend', data: wv.map(d => d.total), type: 'line', borderColor: '#e94560', backgroundColor: 'transparent', borderWidth: 3, pointRadius: 3, tension: 0.3, order: 0, yAxisID: 'y' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true, ticks: { color: '#aaa' }, grid: { color: '#333' } },
+                        y: { stacked: true, beginAtZero: true, ticks: { color: '#aaa' }, grid: { color: '#333' }, title: { display: true, text: 'Volume (lbs/week)', color: '#aaa' } }
+                    },
+                    plugins: { legend: { labels: { color: '#eee' } } }
+                }
+            });
         }
 
         // Load SignalCheck checkins (AM/PM pivot) + sleep_score — spec §4d
@@ -1167,6 +1222,9 @@
                 }
             });
 
+            // Weekly gym volume (spec §4f)
+            renderWeeklyVolumeChart();
+
             // SignalCheck mini-charts (spec §4d)
             renderSignalCheckSection();
 
@@ -1262,7 +1320,7 @@
             const authed = await checkAuth();
             if (!authed) return; // Login form shown
 
-            await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData(), loadCheckinData()]);
+            await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData(), loadCheckinData(), loadWeeklyVolumeData()]);
             await loadData();
             initResizeHandles();
         })();
