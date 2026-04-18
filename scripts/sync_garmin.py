@@ -50,13 +50,23 @@ def categorize(name: str) -> str:
     # Normalize: lowercase + collapse all hyphens/underscores/whitespace to spaces
     import re
     n = re.sub(r"[\s_\-]+", " ", (name or "").lower()).strip()
-    if any(k in n for k in ("bench", "push up", "overhead", "shoulder press", "dip", "press", "fly")):
-        return "upper_push"
-    if any(k in n for k in ("pull up", "chin up", "row", "lat pull", "dead hang", "curl", "pulldown")):
-        return "upper_pull"
-    if any(k in n for k in ("squat", "deadlift", "lunge", "leg press", "calf", "hip thrust", "rdl", "leg curl", "leg extension")):
+    # Lower body FIRST so leg-press/leg-curl/hip-thrust don't match upper "press"/"curl"/"bench"
+    if any(k in n for k in (
+        "squat", "deadlift", "lunge", "leg press", "leg curl", "leg extension",
+        "calf", "hip thrust", "rdl", "step up", "kickback", "glute"
+    )):
         return "lower"
-    if any(k in n for k in ("plank", "crunch", "sit up", "ab ", "core", "russian twist")):
+    if any(k in n for k in (
+        "bench", "push up", "overhead", "shoulder press", "dip", "press",
+        "fly", "tricep", "lateral raise"
+    )):
+        return "upper_push"
+    if any(k in n for k in (
+        "pull up", "chin up", "row", "lat pull", "dead hang", "curl",
+        "pulldown", "face pull", "rear lateral", "biceps", "shrug"
+    )):
+        return "upper_pull"
+    if any(k in n for k in ("plank", "crunch", "sit up", "ab ", "core", "russian twist", "wall slide")):
         return "core"
     return "other"
 
@@ -214,16 +224,19 @@ def sync(conn, client):
                 with conn.cursor() as cur:
                     cur.execute("DELETE FROM workout_sets WHERE session_id = %s", (int(aid),))
                 for i, s in enumerate(sets):
+                    exs = s.get("exercises") or []
+                    name = exs[0].get("name") if exs else s.get("exerciseName")
+                    reps = s.get("repetitionCount") or s.get("reps")
+                    set_type = (s.get("setType") or "").upper()
+                    # Skip rest periods, warm-ups, and any set without a real exercise/reps
+                    if not name or name.lower() == "unknown" or set_type == "REST" or not reps:
+                        continue
                     # garminconnect returns weight in grams sometimes — normalize
                     w_raw = s.get("weight")
                     w_lbs = None
                     if w_raw:
-                        # Heuristic: > 1000 means grams, otherwise already kg
                         kg = w_raw / 1000.0 if w_raw > 1000 else w_raw
                         w_lbs = round(kg * 2.20462, 1)
-                    exs = s.get("exercises") or []
-                    name = exs[0].get("name") if exs else (s.get("exerciseName") or "Unknown")
-                    reps = s.get("repetitionCount") or s.get("reps")
                     with conn.cursor() as cur:
                         cur.execute(
                             """

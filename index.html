@@ -1099,7 +1099,9 @@
         }
 
         function setQuickRange(days) {
-            const end = allData[allData.length - 1]?.date;
+            // Always end "today" — overlay/workout/checkin data is typically more recent
+            // than the most recent nutrition log.
+            const end = new Date().toISOString().split('T')[0];
             const d = new Date(end);
             d.setDate(d.getDate() - parseInt(days));
             const start = d.toISOString().split('T')[0];
