@@ -3,5 +3,11 @@
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" }
   ],
-  "cleanUrls": true
+  "cleanUrls": true,
+  "crons": [
+    {
+      "path": "/api/cron/sync-fitness",
+      "schedule": "0 13 * * *"
+    }
+  ]
 }

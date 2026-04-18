@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Audit — Nutrition Dashboard</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --card: #16213e;
+            --accent: #e94560;
+            --good: #4ade80;
+            --warn: #fbbf24;
+            --bad: #ef4444;
+            --text: #eee;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 1rem;
+            min-height: 100vh;
+        }
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        h1 { font-size: 1.4rem; }
+        a.back {
+            color: #aaa;
+            text-decoration: none;
+            font-size: 0.9rem;
+            padding: 0.4rem 0.8rem;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+        a.back:hover { border-color: var(--accent); color: var(--accent); }
+        .card {
+            background: var(--card);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .controls { display: flex; gap: 1rem; align-items: center; }
+        select, input, button {
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #333;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+        button {
+            background: var(--accent);
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.4; cursor: default; }
+        button.ghost {
+            background: transparent;
+            border: 1px solid #333;
+            color: #ccc;
+            font-weight: 400;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td {
+            text-align: left;
+            padding: 0.6rem 0.5rem;
+            border-bottom: 1px solid #2a2a3a;
+            font-size: 0.88rem;
+            vertical-align: middle;
+        }
+        th { color: #aaa; font-weight: 600; font-size: 0.78rem; text-transform: uppercase; }
+        td.right { text-align: right; }
+        tr.flagged td:first-child::before {
+            content: '⚠ ';
+            color: var(--warn);
+        }
+        tr.bodyweight { background: rgba(251, 191, 36, 0.04); }
+        .pill {
+            display: inline-block;
+            padding: 0.15rem 0.45rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            background: #2a2a3a;
+            color: #aaa;
+            margin-right: 0.25rem;
+        }
+        .pill.cat-upper_push { background: rgba(96,165,250,0.2); color: #60a5fa; }
+        .pill.cat-upper_pull { background: rgba(168,85,247,0.2); color: #a855f7; }
+        .pill.cat-lower      { background: rgba(74,222,128,0.2); color: #4ade80; }
+        .pill.cat-core       { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .weights {
+            font-family: ui-monospace, monospace;
+            font-size: 0.78rem;
+            color: #aaa;
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .std-input { width: 70px; text-align: right; }
+        .status-msg { color: var(--good); font-size: 0.8rem; margin-left: 0.5rem; }
+        .status-msg.error { color: var(--bad); }
+        .empty { color: #888; padding: 2rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>🏋️ Workout Audit</h1>
+        <a href="/" class="back">← Dashboard</a>
+    </div>
+
+    <div class="card">
+        <div class="controls">
+            <label>Window
+                <select id="daysSelect">
+                    <option value="30">30 days</option>
+                    <option value="60">60 days</option>
+                    <option value="90" selected>90 days</option>
+                    <option value="180">180 days</option>
+                </select>
+            </label>
+            <label><input type="checkbox" id="flaggedOnly"> Only flagged (variance &gt; 10%)</label>
+            <button id="reloadBtn">Reload</button>
+            <span id="summary" style="color:#888;font-size:0.85rem;margin-left:auto"></span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div id="tableWrap"><div class="empty">Loading…</div></div>
+    </div>
+
+    <script>
+        const authToken = localStorage.getItem('nutrition_auth_token');
+        const headers = { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) };
+
+        let rows = [];
+
+        async function load() {
+            const days = document.getElementById('daysSelect').value;
+            document.getElementById('tableWrap').innerHTML = '<div class="empty">Loading…</div>';
+            try {
+                const res = await fetch(`/api/workout-audit?days=${days}`, { headers });
+                if (res.status === 401) { location.href = '/'; return; }
+                const json = await res.json();
+                rows = json.data || [];
+                document.getElementById('summary').textContent = `${rows.length} exercises in last ${days} days`;
+                render();
+            } catch (e) {
+                document.getElementById('tableWrap').innerHTML = `<div class="empty">Failed to load: ${e.message}</div>`;
+            }
+        }
+
+        function render() {
+            const flaggedOnly = document.getElementById('flaggedOnly').checked;
+            const visible = flaggedOnly ? rows.filter(r => r.flagged) : rows;
+            if (!visible.length) {
+                document.getElementById('tableWrap').innerHTML = '<div class="empty">No exercises match. (Pipeline may not have populated workout_sets yet.)</div>';
+                return;
+            }
+            const html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Exercise</th>
+                            <th class="right">Times</th>
+                            <th>Logged weights</th>
+                            <th class="right">Min</th>
+                            <th class="right">Max</th>
+                            <th class="right">Mean</th>
+                            <th class="right">Var %</th>
+                            <th>Standard (lbs)</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${visible.map(r => `
+                            <tr class="${r.flagged ? 'flagged' : ''} ${r.is_bodyweight ? 'bodyweight' : ''}" data-ex="${escapeAttr(r.exercise)}">
+                                <td>
+                                    ${escapeHtml(r.exercise)}
+                                    ${r.category ? `<span class="pill cat-${r.category}">${r.category.replace('_',' ')}</span>` : ''}
+                                    ${r.is_bodyweight ? '<span class="pill">bodyweight</span>' : ''}
+                                </td>
+                                <td class="right">${r.times_logged}</td>
+                                <td class="weights" title="${(r.weights || []).join(', ')}">${(r.weights || []).join(', ') || '—'}</td>
+                                <td class="right">${r.min_lbs ?? '—'}</td>
+                                <td class="right">${r.max_lbs ?? '—'}</td>
+                                <td class="right">${r.mean_lbs ?? '—'}</td>
+                                <td class="right" style="color:${r.variance_pct > 10 ? 'var(--warn)' : '#aaa'}">${r.variance_pct}%</td>
+                                <td>
+                                    <input class="std-input" type="number" step="1"
+                                        value="${r.current_standard ?? r.suggested_standard ?? ''}"
+                                        placeholder="${r.suggested_standard ?? ''}">
+                                </td>
+                                <td>
+                                    <button class="ghost std-btn">Standardise</button>
+                                    <span class="status-msg" hidden></span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            document.getElementById('tableWrap').innerHTML = html;
+            document.querySelectorAll('.std-btn').forEach(btn => {
+                btn.addEventListener('click', onStandardise);
+            });
+        }
+
+        async function onStandardise(ev) {
+            const tr = ev.target.closest('tr');
+            const exercise = tr.dataset.ex;
+            const value = +tr.querySelector('.std-input').value;
+            const msg = tr.querySelector('.status-msg');
+            ev.target.disabled = true;
+            try {
+                const res = await fetch('/api/exercise-standards', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ exercise, standard_lbs: value })
+                });
+                if (res.ok) {
+                    msg.textContent = '✓ saved';
+                    msg.classList.remove('error');
+                } else {
+                    const j = await res.json().catch(() => ({}));
+                    msg.textContent = '✗ ' + (j.error || 'failed');
+                    msg.classList.add('error');
+                }
+                msg.hidden = false;
+                setTimeout(() => { msg.hidden = true; }, 2500);
+            } finally {
+                ev.target.disabled = false;
+            }
+        }
+
+        function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function escapeAttr(s) { return escapeHtml(s); }
+
+        document.getElementById('daysSelect').addEventListener('change', load);
+        document.getElementById('reloadBtn').addEventListener('click', load);
+        document.getElementById('flaggedOnly').addEventListener('change', render);
+
+        load();
+    </script>
+</body>
+</html>

@@ -76,6 +76,117 @@
         .toggle-btn.carbs { background: var(--carbs); color: #000; }
         .toggle-btn.fat { background: var(--fat); color: #000; }
         .toggle-btn.inactive { opacity: 0.3; }
+        .quick-range-group {
+            display: flex;
+            gap: 0.25rem;
+        }
+        .quick-btn {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+            background: var(--bg);
+            border: 1px solid #333;
+            color: var(--text);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .quick-btn:hover { border-color: var(--accent); }
+        .quick-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+        .overlays-group { min-width: 0; }
+        .overlay-toggles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            max-width: 460px;
+        }
+        .overlay-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.78rem;
+            border-radius: 999px;
+            border: 1px solid #333;
+            background: var(--bg);
+            cursor: pointer;
+            color: #aaa;
+            user-select: none;
+        }
+        .overlay-pill input { display: none; }
+        .overlay-pill:has(input:checked) {
+            background: color-mix(in srgb, var(--c) 22%, transparent);
+            border-color: var(--c);
+            color: var(--c);
+            font-weight: 600;
+        }
+        .section-title {
+            margin: 1.5rem 0 0.5rem;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #ddd;
+            border-left: 3px solid var(--accent);
+            padding-left: 0.5rem;
+        }
+        .signal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .small-chart .chart-wrapper.small {
+            height: 220px;
+            padding: 0.5rem;
+        }
+        .chart-title .sub {
+            color: #888;
+            font-weight: 400;
+            font-size: 0.8rem;
+            margin-left: 0.5rem;
+        }
+        .mood-grid {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            gap: 3px;
+            padding: 0.75rem;
+            min-height: 220px;
+        }
+        .mood-cell {
+            aspect-ratio: 1;
+            border-radius: 3px;
+            background: #2a2a3a;
+        }
+        .mood-cell[data-v="1"] { background: #5b1d1d; }
+        .mood-cell[data-v="2"] { background: #8a3a1f; }
+        .mood-cell[data-v="3"] { background: #8a7a1f; }
+        .mood-cell[data-v="4"] { background: #3d8a3a; }
+        .mood-cell[data-v="5"] { background: #4ade80; }
+        .habit-grid {
+            display: grid;
+            grid-template-columns: 130px 1fr;
+            gap: 0.5rem;
+            padding: 0.75rem;
+        }
+        .habit-row-label {
+            font-size: 0.85rem;
+            color: #ccc;
+            display: flex;
+            align-items: center;
+        }
+        .habit-row-cells {
+            display: grid;
+            grid-template-columns: repeat(60, 1fr);
+            gap: 2px;
+        }
+        .habit-cell {
+            aspect-ratio: 1;
+            border-radius: 2px;
+            background: #2a2a3a;
+        }
+        .habit-cell.hit  { background: #4ade80; }
+        .habit-cell.miss { background: #ef4444; }
         .checkbox-label {
             display: flex;
             align-items: center;
@@ -235,7 +346,7 @@
     </style>
 </head>
 <body>
-    <h1>🍎 Nutrition Dashboard</h1>
+    <h1>🍎 Nutrition Dashboard <a href="/workout-audit" style="font-size:0.85rem;font-weight:400;color:#aaa;text-decoration:none;border:1px solid #333;padding:0.3rem 0.6rem;border-radius:4px;margin-left:0.5rem;vertical-align:middle;">🏋️ Workout Audit →</a></h1>
     
     <div class="controls">
         <div class="control-group">
@@ -262,23 +373,27 @@
                 <button class="toggle-btn fat active" data-macro="fat">Fat</button>
             </div>
         </div>
-        <div class="control-group">
-            <label>Weight</label>
-            <label class="checkbox-label">
-                <input type="checkbox" id="weightToggle" checked>
-                <span>Show weight overlay</span>
-            </label>
+        <div class="control-group overlays-group">
+            <label>Overlays</label>
+            <div class="overlay-toggles">
+                <label class="overlay-pill" style="--c:#f472b6"><input type="checkbox" id="weightToggle" checked data-overlay="weight"><span>Weight</span></label>
+                <label class="overlay-pill" style="--c:#fb923c"><input type="checkbox" data-overlay="sleep_hours"><span>Sleep</span></label>
+                <label class="overlay-pill" style="--c:#60a5fa"><input type="checkbox" data-overlay="ctl"><span>CTL</span></label>
+                <label class="overlay-pill" style="--c:#ef4444"><input type="checkbox" data-overlay="atl"><span>ATL</span></label>
+                <label class="overlay-pill" style="--c:#a855f7"><input type="checkbox" data-overlay="tsb"><span>TSB</span></label>
+                <label class="overlay-pill" style="--c:#4ade80"><input type="checkbox" data-overlay="restedness_am"><span>Restedness</span></label>
+                <label class="overlay-pill" style="--c:#f97316"><input type="checkbox" data-overlay="doms_am"><span>DOMS</span></label>
+            </div>
         </div>
         <div class="control-group">
             <label>Quick</label>
-            <select id="quickRange">
-                <option value="">Custom</option>
-                <option value="7">Last 7 days</option>
-                <option value="30">Last 30 days</option>
-                <option value="90">Last 90 days</option>
-                <option value="365" selected>Last year</option>
-                <option value="all">All time</option>
-            </select>
+            <div id="quickRange" class="quick-range-group">
+                <button class="quick-btn" data-days="14">14D</button>
+                <button class="quick-btn" data-days="30">30D</button>
+                <button class="quick-btn active" data-days="60">60D</button>
+                <button class="quick-btn" data-days="90">90D</button>
+                <button class="quick-btn" data-days="365">1Y</button>
+            </div>
         </div>
         <div class="control-group">
             <label>Data</label>
@@ -317,7 +432,68 @@
         </div>
         <div class="resize-handle" data-target="macroChartWrapper"></div>
     </div>
-    
+
+    <div class="chart-container resizable">
+        <div class="chart-title">DOMS vs Training Volume <span style="color:#888;font-weight:400;font-size:0.85rem;">— ceiling check (spec §4c)</span></div>
+        <div class="chart-wrapper" id="domsVolumeWrapper">
+            <canvas id="domsVolumeChart"></canvas>
+        </div>
+        <div class="resize-handle" data-target="domsVolumeWrapper"></div>
+    </div>
+
+    <!-- Habit compliance grid — spec §4g -->
+    <div class="chart-container">
+        <div class="chart-title">Habit Compliance — last 60 days <span class="sub">spec §4g</span></div>
+        <div id="habitGrid" class="habit-grid"></div>
+    </div>
+
+    <!-- Body composition — spec §4e -->
+    <div class="chart-container resizable">
+        <div class="chart-title">Body Composition <span class="sub">lean mass + BF% trend (spec §4e)</span></div>
+        <div class="chart-wrapper" id="bodyCompWrapper">
+            <canvas id="bodyCompChart"></canvas>
+        </div>
+        <div class="resize-handle" data-target="bodyCompWrapper"></div>
+    </div>
+
+    <!-- Weekly gym volume — spec §4f -->
+    <div class="chart-container resizable">
+        <div class="chart-title">Weekly Gym Volume <span class="sub">progressive overload — spec §4f</span></div>
+        <div class="chart-wrapper" id="weeklyVolumeWrapper">
+            <canvas id="weeklyVolumeChart"></canvas>
+        </div>
+        <div class="resize-handle" data-target="weeklyVolumeWrapper"></div>
+    </div>
+
+    <!-- SignalCheck subjective overlays — spec §4d -->
+    <div class="section-title">SignalCheck — Subjective Wellbeing</div>
+    <div class="signal-grid">
+        <div class="chart-container small-chart">
+            <div class="chart-title">Restedness vs Sleep <span class="sub">felt vs measured</span></div>
+            <div class="chart-wrapper small"><canvas id="restednessChart"></canvas></div>
+        </div>
+        <div class="chart-container small-chart">
+            <div class="chart-title">Mood — last 60 days <span class="sub">overtraining EWS</span></div>
+            <div id="moodGrid" class="mood-grid"></div>
+        </div>
+        <div class="chart-container small-chart">
+            <div class="chart-title">Hunger vs Calories <span class="sub">under/over-eating signal</span></div>
+            <div class="chart-wrapper small"><canvas id="hungerChart"></canvas></div>
+        </div>
+        <div class="chart-container small-chart">
+            <div class="chart-title">Back Stiffness <span class="sub">flagged > 3</span></div>
+            <div class="chart-wrapper small"><canvas id="backChart"></canvas></div>
+        </div>
+        <div class="chart-container small-chart">
+            <div class="chart-title">General Health <span class="sub">unexplained-dip context</span></div>
+            <div class="chart-wrapper small"><canvas id="generalHealthChart"></canvas></div>
+        </div>
+        <div class="chart-container small-chart">
+            <div class="chart-title">Restedness AM→PM Δ <span class="sub">same-day fatigue signal</span></div>
+            <div class="chart-wrapper small"><canvas id="restednessDeltaChart"></canvas></div>
+        </div>
+    </div>
+
     <div class="chat-container">
         <div class="chat-header">
             <span>🤖</span>
@@ -348,8 +524,24 @@
     <script>
         let allData = [];
         let weightData = [];
-        let macroChart, trendChart;
+        let overlayData = [];   // [{date, sleep_hours, ctl, atl, tsb, restedness_am, doms_am}]
+        let trainingVolumeData = [];  // [{date, volume_lbs, doms_am}]
+        let checkinData = [];  // [{date, restedness_am/pm, mood_am/pm, ..., sleep_score}]
+        let weeklyVolumeData = [];  // [{week_start, upper_push, upper_pull, lower, core, other, total}]
+        let bodyCompData = [];  // [{date, weight_lbs, body_fat_pct, lean_mass_lbs, ...}]
+        let macroChart, trendChart, domsVolumeChart, weeklyVolumeChart, bodyCompChart;
+        let restednessChart, hungerChart, backChart, generalHealthChart, restednessDeltaChart;
         let showMacros = { protein: true, carbs: true, fat: true, weight: true };
+        // Spec §4b — extra line overlays. Default OFF; user toggles to reveal correlations.
+        const OVERLAY_DEFS = [
+            { key: 'sleep_hours',    label: 'Sleep (hrs)',  color: '#fb923c' },
+            { key: 'ctl',            label: 'CTL Fitness',  color: '#60a5fa' },
+            { key: 'atl',            label: 'ATL Fatigue',  color: '#ef4444' },
+            { key: 'tsb',            label: 'TSB Form',     color: '#a855f7' },
+            { key: 'restedness_am',  label: 'Restedness',   color: '#4ade80' },
+            { key: 'doms_am',        label: 'DOMS',         color: '#f97316' }
+        ];
+        let overlayOn = Object.fromEntries(OVERLAY_DEFS.map(o => [o.key, false]));
         
         // === AUTH ===
         let authToken = localStorage.getItem('nutrition_auth_token');
@@ -441,6 +633,257 @@
             } catch (e) {
                 console.log('No weight data available');
             }
+        }
+
+        // Load overlay metrics (sleep / CTL / ATL / TSB / restedness / DOMS) — spec §4b
+        async function loadOverlayData() {
+            try {
+                const res = await fetch('/api/overlays', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    overlayData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
+                    console.log(`Loaded ${overlayData.length} overlay rows`);
+                }
+            } catch (e) {
+                console.log('Overlay endpoint not yet available — main chart will skip overlays');
+            }
+        }
+
+        // Load daily training volume + DOMS — spec §4c
+        async function loadTrainingVolumeData() {
+            try {
+                const res = await fetch('/api/training-volume', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    trainingVolumeData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
+                    console.log(`Loaded ${trainingVolumeData.length} training-volume rows`);
+                }
+            } catch (e) {
+                console.log('Training-volume endpoint not yet available');
+            }
+        }
+
+        // Load habit compliance (last 60 days) — spec §4g
+        async function loadHabits() {
+            try {
+                const res = await fetch('/api/habits?days=60', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    renderHabitGrid(json.dates || [], json.rows || []);
+                }
+            } catch (e) {
+                console.log('Habits endpoint not yet available');
+            }
+        }
+
+        function renderHabitGrid(dates, rows) {
+            const grid = document.getElementById('habitGrid');
+            if (!grid) return;
+            grid.innerHTML = rows.map(row => `
+                <div class="habit-row-label">${row.label}</div>
+                <div class="habit-row-cells">
+                    ${row.hits.map((s, i) => {
+                        const cls = s === 'hit' ? 'hit' : s === 'miss' ? 'miss' : '';
+                        const tip = `${dates[i]}: ${s.replace('_', ' ')}`;
+                        return `<div class="habit-cell ${cls}" title="${tip}"></div>`;
+                    }).join('')}
+                </div>
+            `).join('');
+        }
+
+        // Load body composition (sparse) — spec §4e
+        async function loadBodyCompData() {
+            try {
+                const res = await fetch('/api/body-composition', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    bodyCompData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
+                    console.log(`Loaded ${bodyCompData.length} body-comp rows`);
+                }
+            } catch (e) {
+                console.log('Body-composition endpoint not yet available');
+            }
+        }
+
+        function renderBodyCompChart() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const bc = bodyCompData.filter(d => d.date >= start && d.date <= end);
+            // Combine with weight table for context (more frequent than body-comp scans)
+            const w = weightData.filter(d => d.date >= start && d.date <= end);
+            const allDates = Array.from(new Set([...bc.map(d => d.date), ...w.map(d => d.date)])).sort();
+            const bcByDate = Object.fromEntries(bc.map(d => [d.date, d]));
+            const wByDate  = Object.fromEntries(w.map(d => [d.date, d.weight]));
+
+            if (bodyCompChart) bodyCompChart.destroy();
+            bodyCompChart = new Chart(document.getElementById('bodyCompChart'), {
+                type: 'line',
+                data: {
+                    labels: allDates,
+                    datasets: [
+                        { label: 'Lean mass (lbs)', data: allDates.map(d => bcByDate[d]?.lean_mass_lbs ?? null), borderColor: '#4ade80', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 3, spanGaps: true, tension: 0.3, yAxisID: 'yLbs' },
+                        { label: 'Weight (lbs)',    data: allDates.map(d => bcByDate[d]?.weight_lbs ?? wByDate[d] ?? null), borderColor: '#f472b6', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'yLbs' },
+                        { label: 'Body fat %',      data: allDates.map(d => bcByDate[d]?.body_fat_pct ?? null), borderColor: '#fbbf24', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 3, spanGaps: true, tension: 0.3, yAxisID: 'yPct' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#aaa', maxTicksLimit: 10 }, grid: { color: '#222' } },
+                        yLbs: { position: 'left',  ticks: { color: '#4ade80' }, grid: { color: '#222' }, title: { display: true, text: 'lbs', color: '#4ade80' } },
+                        yPct: { position: 'right', min: 0, max: 30, ticks: { color: '#fbbf24' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'BF %', color: '#fbbf24' } }
+                    },
+                    plugins: { legend: { labels: { color: '#eee' } } }
+                }
+            });
+        }
+
+        // Load weekly gym volume (per category) — spec §4f
+        async function loadWeeklyVolumeData() {
+            try {
+                const res = await fetch('/api/weekly-volume', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    weeklyVolumeData = (json.data || []).slice().sort((a,b) => a.week_start.localeCompare(b.week_start));
+                    console.log(`Loaded ${weeklyVolumeData.length} weekly-volume rows`);
+                }
+            } catch (e) {
+                console.log('Weekly-volume endpoint not yet available');
+            }
+        }
+
+        function renderWeeklyVolumeChart() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const wv = weeklyVolumeData.filter(d => d.week_start >= start && d.week_start <= end);
+            const labels = wv.map(d => d.week_start);
+
+            if (weeklyVolumeChart) weeklyVolumeChart.destroy();
+            weeklyVolumeChart = new Chart(document.getElementById('weeklyVolumeChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Upper Push', data: wv.map(d => d.upper_push), backgroundColor: '#60a5fa', stack: 'cat', order: 2 },
+                        { label: 'Upper Pull', data: wv.map(d => d.upper_pull), backgroundColor: '#a855f7', stack: 'cat', order: 2 },
+                        { label: 'Lower',      data: wv.map(d => d.lower),      backgroundColor: '#4ade80', stack: 'cat', order: 2 },
+                        { label: 'Core',       data: wv.map(d => d.core),       backgroundColor: '#fbbf24', stack: 'cat', order: 2 },
+                        { label: 'Other',      data: wv.map(d => d.other),      backgroundColor: '#666',    stack: 'cat', order: 2 },
+                        { label: 'Total trend', data: wv.map(d => d.total), type: 'line', borderColor: '#e94560', backgroundColor: 'transparent', borderWidth: 3, pointRadius: 3, tension: 0.3, order: 0, yAxisID: 'y' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true, ticks: { color: '#aaa' }, grid: { color: '#333' } },
+                        y: { stacked: true, beginAtZero: true, ticks: { color: '#aaa' }, grid: { color: '#333' }, title: { display: true, text: 'Volume (lbs/week)', color: '#aaa' } }
+                    },
+                    plugins: { legend: { labels: { color: '#eee' } } }
+                }
+            });
+        }
+
+        // Load SignalCheck checkins (AM/PM pivot) + sleep_score — spec §4d
+        async function loadCheckinData() {
+            try {
+                const res = await fetch('/api/checkins', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    checkinData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
+                    console.log(`Loaded ${checkinData.length} checkin rows`);
+                }
+            } catch (e) {
+                console.log('Checkins endpoint not yet available');
+            }
+        }
+
+        function filteredCheckins() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            return checkinData.filter(d => d.date >= start && d.date <= end);
+        }
+
+        function lineChart(canvasId, labels, datasets, opts = {}) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return null;
+            return new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#aaa', maxTicksLimit: 8 }, grid: { color: '#222' } },
+                        y: Object.assign({ ticks: { color: '#aaa' }, grid: { color: '#222' } }, opts.y || {}),
+                        ...(opts.y2 ? { y2: Object.assign({ position: 'right', ticks: { color: '#aaa' }, grid: { drawOnChartArea: false } }, opts.y2) } : {})
+                    },
+                    plugins: { legend: { labels: { color: '#ddd', boxWidth: 12, font: { size: 10 } } } }
+                }
+            });
+        }
+
+        function renderSignalCheckSection() {
+            const ck = filteredCheckins();
+            const labels = ck.map(d => d.date);
+
+            // Restedness AM/PM vs Sleep score (dual axis)
+            if (restednessChart) restednessChart.destroy();
+            restednessChart = lineChart('restednessChart', labels, [
+                { label: 'Restedness AM', data: ck.map(d => d.restedness_am), borderColor: '#4ade80', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
+                { label: 'Restedness PM', data: ck.map(d => d.restedness_pm), borderColor: '#86efac', borderDash: [4,4], backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
+                { label: 'Sleep score',   data: ck.map(d => d.sleep_score),   borderColor: '#fb923c', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'y2' }
+            ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } }, y2: { min: 0, max: 100 } });
+
+            // Mood — GitHub-style 60-day grid
+            const moodGrid = document.getElementById('moodGrid');
+            if (moodGrid) {
+                const last60 = checkinData.slice(-60);
+                moodGrid.innerHTML = last60.map(d => {
+                    const v = d.mood_am ?? d.mood_pm ?? null;
+                    const lvl = v == null ? '' : Math.max(1, Math.min(5, Math.round(v)));
+                    return `<div class="mood-cell" data-v="${lvl}" title="${d.date}: ${v ?? 'no data'}"></div>`;
+                }).join('');
+            }
+
+            // Hunger vs Calories
+            const calByDate = Object.fromEntries(allData.map(d => [d.date, d.calories]));
+            if (hungerChart) hungerChart.destroy();
+            hungerChart = lineChart('hungerChart', labels, [
+                { label: 'Hunger AM', data: ck.map(d => d.hunger_am), borderColor: '#f59e0b', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
+                { label: 'Calories',  data: ck.map(d => calByDate[d.date] ?? null), borderColor: '#e94560', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'y2' }
+            ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } }, y2: { beginAtZero: true } });
+
+            // Back stiffness — line, points red >3
+            if (backChart) backChart.destroy();
+            backChart = lineChart('backChart', labels, [
+                {
+                    label: 'Back Stiffness AM',
+                    data: ck.map(d => d.back_stiffness_am),
+                    borderColor: '#a855f7',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: ck.map(d => (d.back_stiffness_am ?? 0) > 3 ? 4 : 1.5),
+                    pointBackgroundColor: ck.map(d => (d.back_stiffness_am ?? 0) > 3 ? '#ef4444' : '#a855f7'),
+                    spanGaps: true, tension: 0.3
+                }
+            ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } } });
+
+            // General Health
+            if (generalHealthChart) generalHealthChart.destroy();
+            generalHealthChart = lineChart('generalHealthChart', labels, [
+                { label: 'General Health AM', data: ck.map(d => d.general_health_am), borderColor: '#22d3ee', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 }
+            ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } } });
+
+            // Restedness AM→PM delta (negative = same-day fatigue)
+            if (restednessDeltaChart) restednessDeltaChart.destroy();
+            restednessDeltaChart = lineChart('restednessDeltaChart', labels, [
+                {
+                    label: 'PM − AM',
+                    data: ck.map(d => (d.restedness_am != null && d.restedness_pm != null) ? (d.restedness_pm - d.restedness_am) : null),
+                    borderColor: '#4ade80',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3
+                }
+            ], { y: { min: -4, max: 4, ticks: { stepSize: 1 } } });
         }
         
         // Check if question is an aggregation/count query
@@ -594,21 +1037,21 @@
             document.getElementById('endDate').min = minDate;
             document.getElementById('endDate').max = maxDate;
             
-            // Default to last year
-            setQuickRange(365);
-            
+            // Default to last 60 days (spec §4a)
+            setQuickRange(60);
+
             // Event listeners
             document.getElementById('startDate').addEventListener('change', () => {
-                document.getElementById('quickRange').value = '';
+                clearQuickRangeActive();
                 updateCharts();
             });
             document.getElementById('endDate').addEventListener('change', () => {
-                document.getElementById('quickRange').value = '';
+                clearQuickRangeActive();
                 updateCharts();
             });
             document.getElementById('aggregate').addEventListener('change', updateCharts);
-            document.getElementById('quickRange').addEventListener('change', (e) => {
-                if (e.target.value) setQuickRange(e.target.value);
+            document.querySelectorAll('.quick-btn').forEach(btn => {
+                btn.addEventListener('click', () => setQuickRange(btn.dataset.days));
             });
             
             // Macro toggles (buttons)
@@ -627,22 +1070,34 @@
                 showMacros.weight = e.target.checked;
                 updateCharts();
             });
+
+            // Overlay toggle pills (sleep / CTL / ATL / TSB / restedness / DOMS)
+            document.querySelectorAll('.overlay-pill input[data-overlay]').forEach(input => {
+                if (input.dataset.overlay === 'weight') return; // handled above
+                input.addEventListener('change', () => {
+                    overlayOn[input.dataset.overlay] = input.checked;
+                    updateCharts();
+                });
+            });
         }
         
+        function clearQuickRangeActive() {
+            document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+        }
+
         function setQuickRange(days) {
             const end = allData[allData.length - 1]?.date;
-            let start;
-            
-            if (days === 'all') {
-                start = allData[0]?.date;
-            } else {
-                const d = new Date(end);
-                d.setDate(d.getDate() - parseInt(days));
-                start = d.toISOString().split('T')[0];
-            }
-            
+            const d = new Date(end);
+            d.setDate(d.getDate() - parseInt(days));
+            const start = d.toISOString().split('T')[0];
+
             document.getElementById('startDate').value = start;
             document.getElementById('endDate').value = end;
+
+            clearQuickRangeActive();
+            const btn = document.querySelector(`.quick-btn[data-days="${days}"]`);
+            if (btn) btn.classList.add('active');
+
             updateCharts();
         }
         
@@ -742,7 +1197,7 @@
             if (weightData.length > 0 && showMacros.weight) {
                 const weightByDate = {};
                 weightData.forEach(w => weightByDate[w.date] = w.weight);
-                
+
                 // Interpolate weight for dates in range
                 const weightLine = labels.map(date => {
                     if (weightByDate[date]) return weightByDate[date];
@@ -750,7 +1205,7 @@
                     const sorted = weightData.filter(w => w.date <= date).sort((a,b) => b.date.localeCompare(a.date));
                     return sorted[0]?.weight || null;
                 });
-                
+
                 datasets.push({
                     label: 'Weight (lbs)',
                     data: weightLine,
@@ -761,7 +1216,34 @@
                     pointRadius: 2,
                     yAxisID: 'yWeight',
                     tension: 0.3,
-                    order: 0  // Draw on top of bars
+                    order: 0
+                });
+            }
+
+            // Spec §4b — toggleable line overlays (sleep / CTL / ATL / TSB / restedness / DOMS)
+            // Each overlay renders on its own y-axis (display:false) so scales don't fight.
+            // Goal is visual correlation, not exact reading — values are in tooltips.
+            const overlayByDate = {};
+            overlayData.forEach(r => overlayByDate[r.date] = r);
+            for (const def of OVERLAY_DEFS) {
+                if (!overlayOn[def.key]) continue;
+                const series = labels.map(date => {
+                    const r = overlayByDate[date];
+                    return r && r[def.key] != null ? r[def.key] : null;
+                });
+                if (series.every(v => v == null)) continue;  // no data — skip silently
+                datasets.push({
+                    label: def.label,
+                    data: series,
+                    type: 'line',
+                    borderColor: def.color,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 1.5,
+                    yAxisID: 'y_' + def.key,
+                    spanGaps: true,
+                    tension: 0.3,
+                    order: 0
                 });
             }
             
@@ -788,12 +1270,82 @@
                             grid: { drawOnChartArea: false },
                             title: { display: true, text: 'Weight (lbs)', color: '#f472b6' },
                             display: weightData.length > 0 && showMacros.weight
-                        }
+                        },
+                        ...Object.fromEntries(OVERLAY_DEFS.map(def => [
+                            'y_' + def.key,
+                            { position: 'right', display: false, grid: { drawOnChartArea: false } }
+                        ]))
                     },
                     plugins: { legend: { labels: { color: '#eee' } } }
                 }
             });
             
+            // DOMS vs Volume chart (spec §4c) — filtered to current date range
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const tv = trainingVolumeData.filter(d => d.date >= start && d.date <= end);
+            const tvLabels = tv.map(d => d.date);
+            if (domsVolumeChart) domsVolumeChart.destroy();
+            domsVolumeChart = new Chart(document.getElementById('domsVolumeChart'), {
+                type: 'bar',
+                data: {
+                    labels: tvLabels,
+                    datasets: [
+                        {
+                            label: 'Volume (lbs lifted)',
+                            data: tv.map(d => d.volume_lbs),
+                            backgroundColor: '#888',
+                            yAxisID: 'yVol',
+                            order: 2
+                        },
+                        {
+                            label: 'DOMS (AM, 0–5)',
+                            data: tv.map(d => d.doms_am),
+                            type: 'line',
+                            borderColor: '#f97316',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            pointRadius: 2,
+                            spanGaps: true,
+                            tension: 0.3,
+                            yAxisID: 'yDoms',
+                            order: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#aaa' }, grid: { color: '#333' } },
+                        yVol: {
+                            position: 'left',
+                            beginAtZero: true,
+                            ticks: { color: '#aaa' },
+                            grid: { color: '#333' },
+                            title: { display: true, text: 'Volume (lbs)', color: '#aaa' }
+                        },
+                        yDoms: {
+                            position: 'right',
+                            min: 0, max: 5,
+                            ticks: { color: '#f97316', stepSize: 1 },
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'DOMS (0–5)', color: '#f97316' }
+                        }
+                    },
+                    plugins: { legend: { labels: { color: '#eee' } } }
+                }
+            });
+
+            // Body composition (spec §4e)
+            renderBodyCompChart();
+
+            // Weekly gym volume (spec §4f)
+            renderWeeklyVolumeChart();
+
+            // SignalCheck mini-charts (spec §4d)
+            renderSignalCheckSection();
+
             // Trend chart (calories + protein)
             if (trendChart) trendChart.destroy();
             trendChart = new Chart(document.getElementById('trendChart'), {
@@ -860,9 +1412,9 @@
                     document.removeEventListener('mouseup', onEnd);
                     document.removeEventListener('touchmove', onMove);
                     document.removeEventListener('touchend', onEnd);
-                    // Trigger chart resize
                     if (macroChart) macroChart.resize();
                     if (trendChart) trendChart.resize();
+                    if (domsVolumeChart) domsVolumeChart.resize();
                 };
                 
                 const onStart = (e) => {
@@ -885,8 +1437,8 @@
         (async () => {
             const authed = await checkAuth();
             if (!authed) return; // Login form shown
-            
-            await loadWeightData();
+
+            await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData(), loadCheckinData(), loadWeeklyVolumeData(), loadBodyCompData(), loadHabits()]);
             await loadData();
             initResizeHandles();
         })();
