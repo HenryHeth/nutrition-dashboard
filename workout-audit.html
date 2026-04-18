@@ -146,7 +146,7 @@
             const days = document.getElementById('daysSelect').value;
             document.getElementById('tableWrap').innerHTML = '<div class="empty">Loading…</div>';
             try {
-                const res = await fetch(`/api/workout-audit?days=${days}`, { headers });
+                const res = await fetch(`/api/fitness/workout-audit?days=${days}`, { headers });
                 if (res.status === 401) { location.href = '/'; return; }
                 const json = await res.json();
                 rows = json.data || [];
@@ -220,7 +220,7 @@
             const msg = tr.querySelector('.status-msg');
             ev.target.disabled = true;
             try {
-                const res = await fetch('/api/exercise-standards', {
+                const res = await fetch('/api/fitness/exercise-standards', {
                     method: 'POST',
                     headers,
                     body: JSON.stringify({ exercise, standard_lbs: value })

@@ -638,7 +638,7 @@
         // Load overlay metrics (sleep / CTL / ATL / TSB / restedness / DOMS) — spec §4b
         async function loadOverlayData() {
             try {
-                const res = await fetch('/api/overlays', { headers: getAuthHeaders() });
+                const res = await fetch('/api/fitness/overlays', { headers: getAuthHeaders() });
                 if (res.ok) {
                     const json = await res.json();
                     overlayData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
@@ -652,7 +652,7 @@
         // Load daily training volume + DOMS — spec §4c
         async function loadTrainingVolumeData() {
             try {
-                const res = await fetch('/api/training-volume', { headers: getAuthHeaders() });
+                const res = await fetch('/api/fitness/training-volume', { headers: getAuthHeaders() });
                 if (res.ok) {
                     const json = await res.json();
                     trainingVolumeData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
@@ -666,7 +666,7 @@
         // Load habit compliance (last 60 days) — spec §4g
         async function loadHabits() {
             try {
-                const res = await fetch('/api/habits?days=60', { headers: getAuthHeaders() });
+                const res = await fetch('/api/fitness/habits?days=60', { headers: getAuthHeaders() });
                 if (res.ok) {
                     const json = await res.json();
                     renderHabitGrid(json.dates || [], json.rows || []);
@@ -694,7 +694,7 @@
         // Load body composition (sparse) — spec §4e
         async function loadBodyCompData() {
             try {
-                const res = await fetch('/api/body-composition', { headers: getAuthHeaders() });
+                const res = await fetch('/api/fitness/body-composition', { headers: getAuthHeaders() });
                 if (res.ok) {
                     const json = await res.json();
                     bodyCompData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
@@ -741,7 +741,7 @@
         // Load weekly gym volume (per category) — spec §4f
         async function loadWeeklyVolumeData() {
             try {
-                const res = await fetch('/api/weekly-volume', { headers: getAuthHeaders() });
+                const res = await fetch('/api/fitness/weekly-volume', { headers: getAuthHeaders() });
                 if (res.ok) {
                     const json = await res.json();
                     weeklyVolumeData = (json.data || []).slice().sort((a,b) => a.week_start.localeCompare(b.week_start));
@@ -786,7 +786,7 @@
         // Load SignalCheck checkins (AM/PM pivot) + sleep_score — spec §4d
         async function loadCheckinData() {
             try {
-                const res = await fetch('/api/checkins', { headers: getAuthHeaders() });
+                const res = await fetch('/api/fitness/checkins', { headers: getAuthHeaders() });
                 if (res.ok) {
                     const json = await res.json();
                     checkinData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
