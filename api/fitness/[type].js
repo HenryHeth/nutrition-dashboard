@@ -20,7 +20,8 @@ const handlers = {
   'checkins':            require('../../lib/handlers/checkins'),
   'habits':              require('../../lib/handlers/habits'),
   'workout-audit':       require('../../lib/handlers/workout-audit'),
-  'exercise-standards':  require('../../lib/handlers/exercise-standards')
+  'exercise-standards':  require('../../lib/handlers/exercise-standards'),
+  'matt-synopsis':       require('../../lib/handlers/matt-synopsis')
 };
 
 module.exports = (req, res) => {

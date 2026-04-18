@@ -313,6 +313,75 @@
         .stat-card.carbs .value { color: var(--carbs); }
         .stat-card.fat .value { color: var(--fat); }
         .stat-card.calories .value { color: var(--accent); }
+        .matt-card {
+            background: linear-gradient(135deg, #16213e 0%, #1e2a4a 100%);
+            border: 1px solid #2a3a5a;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .matt-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+        }
+        .matt-emoji { font-size: 1.4rem; }
+        .matt-title { font-weight: 700; font-size: 1.05rem; color: #ddd; margin-right: auto; }
+        .matt-control {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.75rem;
+            color: #aaa;
+        }
+        .matt-control select {
+            padding: 0.3rem 0.5rem;
+            font-size: 0.8rem;
+            background: var(--bg);
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: var(--text);
+        }
+        #mattRefresh {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.8rem;
+            background: var(--accent);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        #mattRefresh:disabled { opacity: 0.5; cursor: wait; }
+        .matt-age { font-size: 0.7rem; color: #888; }
+        .matt-body {
+            color: #ddd;
+            font-size: 0.9rem;
+            line-height: 1.55;
+        }
+        .matt-body h2 {
+            font-size: 0.95rem;
+            margin: 0.75rem 0 0.4rem;
+            color: #fff;
+            border-bottom: 1px solid #2a3a5a;
+            padding-bottom: 0.25rem;
+        }
+        .matt-body h2:first-child { margin-top: 0; }
+        .matt-body ul { margin: 0.25rem 0 0.5rem 1.25rem; padding: 0; }
+        .matt-body li { margin: 0.2rem 0; }
+        .matt-body strong { color: #fff; }
+        .matt-body code {
+            background: rgba(0,0,0,0.3);
+            padding: 0.05rem 0.3rem;
+            border-radius: 3px;
+            font-size: 0.85em;
+        }
+        .matt-hint { color: #888; font-style: italic; }
+        .matt-loading { color: #aaa; }
+        .matt-error { color: #ef4444; }
         .chart-container {
             background: var(--card);
             border-radius: 8px;
@@ -445,7 +514,43 @@
             <div class="label">Days Logged</div>
         </div>
     </div>
-    
+
+    <!-- Matt's Synopsis — AI-generated coach summary scaled by mode + criticality -->
+    <div class="matt-card">
+        <div class="matt-header">
+            <span class="matt-emoji">💪</span>
+            <span class="matt-title">Matt's Read</span>
+            <label class="matt-control">Mode
+                <select id="mattMode">
+                    <option value="balanced">Balanced</option>
+                    <option value="bulk">Bulk</option>
+                    <option value="cut">Cut</option>
+                    <option value="tri">Triathlon</option>
+                </select>
+            </label>
+            <label class="matt-control">Tone
+                <select id="mattCriticality">
+                    <option value="gentle">Gentle</option>
+                    <option value="balanced" selected>Balanced</option>
+                    <option value="blunt">Blunt</option>
+                </select>
+            </label>
+            <label class="matt-control">Window
+                <select id="mattDays">
+                    <option value="3">3D</option>
+                    <option value="7" selected>7D</option>
+                    <option value="14">14D</option>
+                    <option value="30">30D</option>
+                </select>
+            </label>
+            <button id="mattRefresh">🔄 Generate</button>
+            <span id="mattAge" class="matt-age"></span>
+        </div>
+        <div id="mattBody" class="matt-body">
+            <span class="matt-hint">Pick a mode + tone, click Generate. Matt will read the last week and give you a focused take.</span>
+        </div>
+    </div>
+
     <div class="chart-container resizable">
         <div class="chart-title">Macros Over Time (stacked) + Weight</div>
         <div class="chart-wrapper" id="macroChartWrapper">
@@ -637,6 +742,92 @@
         }
         
         // Load weight data from server
+        // === Matt's Synopsis ===
+        // Tiny markdown→HTML helper (handles ## headers, - bullets, **bold**, `code`, paragraphs)
+        function mdToHtml(md) {
+            const escape = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const lines = md.split('\n');
+            const out = [];
+            let inList = false;
+            for (let line of lines) {
+                line = line.replace(/\r$/, '');
+                if (/^## /.test(line)) {
+                    if (inList) { out.push('</ul>'); inList = false; }
+                    out.push('<h2>' + escape(line.slice(3).trim()) + '</h2>');
+                } else if (/^[-*] /.test(line)) {
+                    if (!inList) { out.push('<ul>'); inList = true; }
+                    let item = escape(line.replace(/^[-*] /, ''));
+                    item = item.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                    item = item.replace(/`([^`]+)`/g, '<code>$1</code>');
+                    out.push('<li>' + item + '</li>');
+                } else if (/^\s*$/.test(line)) {
+                    if (inList) { out.push('</ul>'); inList = false; }
+                } else {
+                    if (inList) { out.push('</ul>'); inList = false; }
+                    let p = escape(line);
+                    p = p.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                    p = p.replace(/`([^`]+)`/g, '<code>$1</code>');
+                    out.push('<p>' + p + '</p>');
+                }
+            }
+            if (inList) out.push('</ul>');
+            return out.join('\n');
+        }
+
+        async function fetchMatt() {
+            const mode = document.getElementById('mattMode').value;
+            const criticality = document.getElementById('mattCriticality').value;
+            const days = document.getElementById('mattDays').value;
+            // Persist preferences
+            localStorage.setItem('matt_prefs', JSON.stringify({ mode, criticality, days }));
+
+            const body = document.getElementById('mattBody');
+            const btn = document.getElementById('mattRefresh');
+            const age = document.getElementById('mattAge');
+            body.innerHTML = '<span class="matt-loading">💪 Matt is reading your week…</span>';
+            age.textContent = '';
+            btn.disabled = true;
+            try {
+                const res = await fetch(`/api/fitness/matt-synopsis?mode=${mode}&criticality=${criticality}&days=${days}`, { headers: getAuthHeaders() });
+                if (!res.ok) {
+                    const j = await res.json().catch(() => ({}));
+                    body.innerHTML = `<span class="matt-error">Matt error: ${j.error || res.status}</span>`;
+                    return;
+                }
+                const j = await res.json();
+                body.innerHTML = mdToHtml(j.synopsis || '');
+                age.textContent = `${j.days}-day window · ${MODES_LABEL[j.mode] || j.mode} · ${j.criticality} · ${new Date(j.generated_at).toLocaleTimeString()}`;
+            } catch (e) {
+                body.innerHTML = `<span class="matt-error">Matt error: ${e.message}</span>`;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        const MODES_LABEL = { balanced: 'Balanced', bulk: 'Bulk', cut: 'Cut', tri: 'Triathlon' };
+
+        function initMatt() {
+            // Restore prefs
+            try {
+                const p = JSON.parse(localStorage.getItem('matt_prefs') || '{}');
+                if (p.mode)        document.getElementById('mattMode').value = p.mode;
+                if (p.criticality) document.getElementById('mattCriticality').value = p.criticality;
+                if (p.days)        document.getElementById('mattDays').value = p.days;
+            } catch (_) {}
+            document.getElementById('mattRefresh').addEventListener('click', fetchMatt);
+            ['mattMode','mattCriticality','mattDays'].forEach(id => {
+                document.getElementById(id).addEventListener('change', () => {
+                    // persist immediately, but don't auto-fire (Anthropic call costs $)
+                    const prefs = {
+                        mode: document.getElementById('mattMode').value,
+                        criticality: document.getElementById('mattCriticality').value,
+                        days: document.getElementById('mattDays').value
+                    };
+                    localStorage.setItem('matt_prefs', JSON.stringify(prefs));
+                });
+            });
+        }
+
         async function loadWeightData() {
             try {
                 const res = await fetch('/api/weight', { headers: getAuthHeaders() });
@@ -1571,6 +1762,7 @@
             await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData(), loadCheckinData(), loadWeeklyVolumeData(), loadBodyCompData()]);
             await loadData();
             initResizeHandles();
+            initMatt();
         })();
     </script>
 </body>
