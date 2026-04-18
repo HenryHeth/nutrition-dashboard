@@ -534,7 +534,7 @@
         let showMacros = { protein: true, carbs: true, fat: true, weight: true };
         // Spec §4b — extra line overlays. Default OFF; user toggles to reveal correlations.
         const OVERLAY_DEFS = [
-            { key: 'sleep_hours',    label: 'Sleep (hrs)',  color: '#fb923c' },
+            { key: 'sleep_hours',    label: 'Sleep',        color: '#fb923c' },  // suffix appended dynamically with source
             { key: 'ctl',            label: 'CTL Fitness',  color: '#60a5fa' },
             { key: 'atl',            label: 'ATL Fatigue',  color: '#ef4444' },
             { key: 'tsb',            label: 'TSB Form',     color: '#a855f7' },
@@ -803,6 +803,21 @@
             return checkinData.filter(d => d.date >= start && d.date <= end);
         }
 
+        // Pick the device label for a sleep series. Prefer Fitbit when both are present.
+        function prettySleepSource(rows) {
+            const counts = {};
+            for (const r of rows) {
+                if (r.sleep_hours == null) continue;
+                const s = r.sleep_source || 'unknown';
+                counts[s] = (counts[s] || 0) + 1;
+            }
+            if (counts.fitbit && counts.garmin) return 'Fitbit + Garmin';
+            if (counts.fitbit) return 'Fitbit';
+            if (counts.garmin) return 'Garmin';
+            const k = Object.keys(counts);
+            return k.length ? k[0].charAt(0).toUpperCase() + k.slice(1).join('') : '—';
+        }
+
         function lineChart(canvasId, labels, datasets, opts = {}) {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return null;
@@ -830,7 +845,7 @@
             restednessChart = lineChart('restednessChart', labels, [
                 { label: 'Restedness AM', data: ck.map(d => d.restedness_am), borderColor: '#4ade80', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
                 { label: 'Restedness PM', data: ck.map(d => d.restedness_pm), borderColor: '#86efac', borderDash: [4,4], backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
-                { label: 'Sleep score',   data: ck.map(d => d.sleep_score),   borderColor: '#fb923c', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'y2' }
+                { label: `Sleep score (${prettySleepSource(ck)})`, data: ck.map(d => d.sleep_score),   borderColor: '#fb923c', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'y2' }
             ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } }, y2: { min: 0, max: 100 } });
 
             // Mood — GitHub-style 60-day grid
@@ -884,7 +899,7 @@
                     borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3
                 },
                 {
-                    label: 'Sleep score',
+                    label: `Sleep score (${prettySleepSource(ck)})`,
                     data: ck.map(d => d.sleep_score),
                     borderColor: '#fb923c',
                     backgroundColor: 'transparent',
@@ -1247,8 +1262,13 @@
                     return r && r[def.key] != null ? r[def.key] : null;
                 });
                 if (series.every(v => v == null)) continue;  // no data — skip silently
+                let label = def.label;
+                if (def.key === 'sleep_hours') {
+                    const visible = labels.map(d => overlayByDate[d]).filter(Boolean);
+                    label = `Sleep (${prettySleepSource(visible)} hrs)`;
+                }
                 datasets.push({
-                    label: def.label,
+                    label,
                     data: series,
                     type: 'line',
                     borderColor: def.color,
@@ -1300,6 +1320,7 @@
             const end = document.getElementById('endDate').value;
             const tv = trainingVolumeData.filter(d => d.date >= start && d.date <= end);
             const tvLabels = tv.map(d => d.date);
+            const tvSleepLabel = `Sleep (${prettySleepSource(tv)} hrs)`;
             if (domsVolumeChart) domsVolumeChart.destroy();
             domsVolumeChart = new Chart(document.getElementById('domsVolumeChart'), {
                 type: 'bar',
@@ -1325,6 +1346,20 @@
                             tension: 0.3,
                             yAxisID: 'yDoms',
                             order: 0
+                        },
+                        {
+                            label: tvSleepLabel,
+                            data: tv.map(d => d.sleep_hours),
+                            type: 'line',
+                            borderColor: '#fb923c',
+                            backgroundColor: 'transparent',
+                            borderDash: [4, 4],
+                            borderWidth: 2,
+                            pointRadius: 1.5,
+                            spanGaps: true,
+                            tension: 0.3,
+                            yAxisID: 'ySleep',
+                            order: 0
                         }
                     ]
                 },
@@ -1346,6 +1381,12 @@
                             ticks: { color: '#f97316', stepSize: 1 },
                             grid: { drawOnChartArea: false },
                             title: { display: true, text: 'DOMS (0–5)', color: '#f97316' }
+                        },
+                        ySleep: {
+                            position: 'right',
+                            min: 0, max: 12,
+                            display: false,
+                            grid: { drawOnChartArea: false }
                         }
                     },
                     plugins: { legend: { labels: { color: '#eee' } } }

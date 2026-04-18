@@ -134,15 +134,25 @@ def sync(conn, client):
                 score_val = overall.get("value") if isinstance(overall, dict) else overall
             if total_sec > 0:
                 with conn.cursor() as cur:
+                    # Don't clobber Fitbit-via-TP sleep — Paul prefers Fitbit when both exist.
                     cur.execute(
                         """
-                        INSERT INTO daily_metrics (date, sleep_hours, sleep_score, source, raw, updated_at)
-                        VALUES (%s, %s, %s, 'garmin', %s, NOW())
+                        INSERT INTO daily_metrics (date, sleep_hours, sleep_score, sleep_source, source, raw, updated_at)
+                        VALUES (%s, %s, %s, 'garmin', 'garmin', %s, NOW())
                         ON CONFLICT (date) DO UPDATE
-                          SET sleep_hours = COALESCE(EXCLUDED.sleep_hours, daily_metrics.sleep_hours),
-                              sleep_score = COALESCE(EXCLUDED.sleep_score, daily_metrics.sleep_score),
-                              raw         = EXCLUDED.raw,
-                              updated_at  = NOW()
+                          SET sleep_hours  = CASE
+                                WHEN daily_metrics.sleep_source IS NULL OR daily_metrics.sleep_source = 'garmin'
+                                  THEN EXCLUDED.sleep_hours
+                                ELSE daily_metrics.sleep_hours
+                              END,
+                              sleep_score  = CASE
+                                WHEN daily_metrics.sleep_source IS NULL OR daily_metrics.sleep_source = 'garmin'
+                                  THEN EXCLUDED.sleep_score
+                                ELSE daily_metrics.sleep_score
+                              END,
+                              sleep_source = COALESCE(daily_metrics.sleep_source, 'garmin'),
+                              raw          = EXCLUDED.raw,
+                              updated_at   = NOW()
                         """,
                         (d.isoformat(), round(total_sec / 3600, 2), score_val, Json(s)),
                     )
