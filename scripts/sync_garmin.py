@@ -141,14 +141,12 @@ def sync(conn, client):
                         VALUES (%s, %s, %s, 'garmin', 'garmin', %s, NOW())
                         ON CONFLICT (date) DO UPDATE
                           SET sleep_hours  = CASE
-                                WHEN daily_metrics.sleep_source IS NULL OR daily_metrics.sleep_source = 'garmin'
-                                  THEN EXCLUDED.sleep_hours
-                                ELSE daily_metrics.sleep_hours
+                                WHEN daily_metrics.sleep_source IN ('fitbit') THEN daily_metrics.sleep_hours
+                                ELSE EXCLUDED.sleep_hours
                               END,
                               sleep_score  = CASE
-                                WHEN daily_metrics.sleep_source IS NULL OR daily_metrics.sleep_source = 'garmin'
-                                  THEN EXCLUDED.sleep_score
-                                ELSE daily_metrics.sleep_score
+                                WHEN daily_metrics.sleep_source IN ('fitbit') THEN daily_metrics.sleep_score
+                                ELSE EXCLUDED.sleep_score
                               END,
                               sleep_source = COALESCE(daily_metrics.sleep_source, 'garmin'),
                               raw          = EXCLUDED.raw,

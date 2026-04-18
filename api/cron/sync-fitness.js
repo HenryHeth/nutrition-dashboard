@@ -3,11 +3,17 @@ const trainingpeaks = require('../../lib/sources/trainingpeaks');
 const garmin = require('../../lib/sources/garmin');
 const fatsecret = require('../../lib/sources/fatsecret');
 const signalcheck = require('../../lib/sources/signalcheck');
+const fitbit = require('../../lib/sources/fitbit');
 
 // Vercel Cron: hits this endpoint daily per vercel.json schedule.
 // Vercel sets `Authorization: Bearer ${CRON_SECRET}` automatically.
 
+// Order matters for sleep precedence:
+//   fitbit (direct) → trainingpeaks (FitnessSyncer-via-TP) → garmin
+// Each later source uses COALESCE so it doesn't overwrite an earlier-set
+// sleep_source; Garmin's CASE statement explicitly skips when sleep_source='fitbit'.
 const SOURCES = [
+  ['fitbit',        fitbit.syncDay],
   ['trainingpeaks', trainingpeaks.syncDay],
   ['garmin',        garmin.syncDay],
   ['fatsecret',     fatsecret.syncDay],
