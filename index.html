@@ -417,6 +417,15 @@
         <div class="resize-handle" data-target="domsVolumeWrapper"></div>
     </div>
 
+    <!-- Body composition — spec §4e -->
+    <div class="chart-container resizable">
+        <div class="chart-title">Body Composition <span class="sub">lean mass + BF% trend (spec §4e)</span></div>
+        <div class="chart-wrapper" id="bodyCompWrapper">
+            <canvas id="bodyCompChart"></canvas>
+        </div>
+        <div class="resize-handle" data-target="bodyCompWrapper"></div>
+    </div>
+
     <!-- Weekly gym volume — spec §4f -->
     <div class="chart-container resizable">
         <div class="chart-title">Weekly Gym Volume <span class="sub">progressive overload — spec §4f</span></div>
@@ -489,7 +498,8 @@
         let trainingVolumeData = [];  // [{date, volume_lbs, doms_am}]
         let checkinData = [];  // [{date, restedness_am/pm, mood_am/pm, ..., sleep_score}]
         let weeklyVolumeData = [];  // [{week_start, upper_push, upper_pull, lower, core, other, total}]
-        let macroChart, trendChart, domsVolumeChart, weeklyVolumeChart;
+        let bodyCompData = [];  // [{date, weight_lbs, body_fat_pct, lean_mass_lbs, ...}]
+        let macroChart, trendChart, domsVolumeChart, weeklyVolumeChart, bodyCompChart;
         let restednessChart, hungerChart, backChart, generalHealthChart, restednessDeltaChart;
         let showMacros = { protein: true, carbs: true, fat: true, weight: true };
         // Spec §4b — extra line overlays. Default OFF; user toggles to reveal correlations.
@@ -621,6 +631,53 @@
             } catch (e) {
                 console.log('Training-volume endpoint not yet available');
             }
+        }
+
+        // Load body composition (sparse) — spec §4e
+        async function loadBodyCompData() {
+            try {
+                const res = await fetch('/api/body-composition', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    bodyCompData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
+                    console.log(`Loaded ${bodyCompData.length} body-comp rows`);
+                }
+            } catch (e) {
+                console.log('Body-composition endpoint not yet available');
+            }
+        }
+
+        function renderBodyCompChart() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const bc = bodyCompData.filter(d => d.date >= start && d.date <= end);
+            // Combine with weight table for context (more frequent than body-comp scans)
+            const w = weightData.filter(d => d.date >= start && d.date <= end);
+            const allDates = Array.from(new Set([...bc.map(d => d.date), ...w.map(d => d.date)])).sort();
+            const bcByDate = Object.fromEntries(bc.map(d => [d.date, d]));
+            const wByDate  = Object.fromEntries(w.map(d => [d.date, d.weight]));
+
+            if (bodyCompChart) bodyCompChart.destroy();
+            bodyCompChart = new Chart(document.getElementById('bodyCompChart'), {
+                type: 'line',
+                data: {
+                    labels: allDates,
+                    datasets: [
+                        { label: 'Lean mass (lbs)', data: allDates.map(d => bcByDate[d]?.lean_mass_lbs ?? null), borderColor: '#4ade80', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 3, spanGaps: true, tension: 0.3, yAxisID: 'yLbs' },
+                        { label: 'Weight (lbs)',    data: allDates.map(d => bcByDate[d]?.weight_lbs ?? wByDate[d] ?? null), borderColor: '#f472b6', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'yLbs' },
+                        { label: 'Body fat %',      data: allDates.map(d => bcByDate[d]?.body_fat_pct ?? null), borderColor: '#fbbf24', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 3, spanGaps: true, tension: 0.3, yAxisID: 'yPct' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#aaa', maxTicksLimit: 10 }, grid: { color: '#222' } },
+                        yLbs: { position: 'left',  ticks: { color: '#4ade80' }, grid: { color: '#222' }, title: { display: true, text: 'lbs', color: '#4ade80' } },
+                        yPct: { position: 'right', min: 0, max: 30, ticks: { color: '#fbbf24' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'BF %', color: '#fbbf24' } }
+                    },
+                    plugins: { legend: { labels: { color: '#eee' } } }
+                }
+            });
         }
 
         // Load weekly gym volume (per category) — spec §4f
@@ -1222,6 +1279,9 @@
                 }
             });
 
+            // Body composition (spec §4e)
+            renderBodyCompChart();
+
             // Weekly gym volume (spec §4f)
             renderWeeklyVolumeChart();
 
@@ -1320,7 +1380,7 @@
             const authed = await checkAuth();
             if (!authed) return; // Login form shown
 
-            await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData(), loadCheckinData(), loadWeeklyVolumeData()]);
+            await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData(), loadCheckinData(), loadWeeklyVolumeData(), loadBodyCompData()]);
             await loadData();
             initResizeHandles();
         })();
