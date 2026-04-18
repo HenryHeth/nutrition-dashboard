@@ -357,6 +357,7 @@
         }
         #mattRefresh:disabled { opacity: 0.5; cursor: wait; }
         .matt-age { font-size: 0.7rem; color: #888; }
+        .matt-window-hint { font-size: 0.7rem; color: #666; font-style: italic; }
         .matt-body {
             color: #ddd;
             font-size: 0.9rem;
@@ -535,14 +536,7 @@
                     <option value="blunt">Blunt</option>
                 </select>
             </label>
-            <label class="matt-control">Window
-                <select id="mattDays">
-                    <option value="3">3D</option>
-                    <option value="7" selected>7D</option>
-                    <option value="14">14D</option>
-                    <option value="30">30D</option>
-                </select>
-            </label>
+            <span class="matt-control matt-window-hint">Window: follows date picker above</span>
             <button id="mattRefresh">🔄 Generate</button>
             <span id="mattAge" class="matt-age"></span>
         </div>
@@ -777,18 +771,19 @@
         async function fetchMatt() {
             const mode = document.getElementById('mattMode').value;
             const criticality = document.getElementById('mattCriticality').value;
-            const days = document.getElementById('mattDays').value;
-            // Persist preferences
-            localStorage.setItem('matt_prefs', JSON.stringify({ mode, criticality, days }));
+            const from = document.getElementById('startDate').value;
+            const to   = document.getElementById('endDate').value;
+            // Persist preferences (mode + tone only — range comes from the picker)
+            localStorage.setItem('matt_prefs', JSON.stringify({ mode, criticality }));
 
             const body = document.getElementById('mattBody');
             const btn = document.getElementById('mattRefresh');
             const age = document.getElementById('mattAge');
-            body.innerHTML = '<span class="matt-loading">💪 Matt is reading your week…</span>';
+            body.innerHTML = '<span class="matt-loading">💪 Matt is reading your data…</span>';
             age.textContent = '';
             btn.disabled = true;
             try {
-                const res = await fetch(`/api/fitness/matt-synopsis?mode=${mode}&criticality=${criticality}&days=${days}`, { headers: getAuthHeaders() });
+                const res = await fetch(`/api/fitness/matt-synopsis?mode=${mode}&criticality=${criticality}&from=${from}&to=${to}`, { headers: getAuthHeaders() });
                 if (!res.ok) {
                     const j = await res.json().catch(() => ({}));
                     body.innerHTML = `<span class="matt-error">Matt error: ${j.error || res.status}</span>`;
@@ -796,7 +791,8 @@
                 }
                 const j = await res.json();
                 body.innerHTML = mdToHtml(j.synopsis || '');
-                age.textContent = `${j.days}-day window · ${MODES_LABEL[j.mode] || j.mode} · ${j.criticality} · ${new Date(j.generated_at).toLocaleTimeString()}`;
+                const cost = j.usage ? ` · ${j.usage.input_tokens}↑/${j.usage.output_tokens}↓ tokens` : '';
+                age.textContent = `${j.days}d (${j.from}→${j.to}) · ${MODES_LABEL[j.mode] || j.mode} · ${j.criticality} · ${new Date(j.generated_at).toLocaleTimeString()}${cost}`;
             } catch (e) {
                 body.innerHTML = `<span class="matt-error">Matt error: ${e.message}</span>`;
             } finally {
@@ -807,23 +803,19 @@
         const MODES_LABEL = { balanced: 'Balanced', bulk: 'Bulk', cut: 'Cut', tri: 'Triathlon' };
 
         function initMatt() {
-            // Restore prefs
+            // Restore prefs (mode + tone only)
             try {
                 const p = JSON.parse(localStorage.getItem('matt_prefs') || '{}');
                 if (p.mode)        document.getElementById('mattMode').value = p.mode;
                 if (p.criticality) document.getElementById('mattCriticality').value = p.criticality;
-                if (p.days)        document.getElementById('mattDays').value = p.days;
             } catch (_) {}
             document.getElementById('mattRefresh').addEventListener('click', fetchMatt);
-            ['mattMode','mattCriticality','mattDays'].forEach(id => {
+            ['mattMode','mattCriticality'].forEach(id => {
                 document.getElementById(id).addEventListener('change', () => {
-                    // persist immediately, but don't auto-fire (Anthropic call costs $)
-                    const prefs = {
+                    localStorage.setItem('matt_prefs', JSON.stringify({
                         mode: document.getElementById('mattMode').value,
-                        criticality: document.getElementById('mattCriticality').value,
-                        days: document.getElementById('mattDays').value
-                    };
-                    localStorage.setItem('matt_prefs', JSON.stringify(prefs));
+                        criticality: document.getElementById('mattCriticality').value
+                    }));
                 });
             });
         }
