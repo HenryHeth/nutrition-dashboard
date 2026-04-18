@@ -173,10 +173,9 @@
             grid-template-columns: repeat(15, 1fr);
             gap: 3px;
             padding: 0.75rem;
-            min-height: 220px;
         }
         .mood-cell {
-            aspect-ratio: 1;
+            height: 28px;
             border-radius: 3px;
             background: #2a2a3a;
         }
@@ -404,7 +403,7 @@
                 <label class="overlay-pill" style="--c:#ef4444" data-tooltip="ATL — Fatigue&#10;7-day rolling average of daily TSS.&#10;The cost of recent training (like a big ski week). Rises and falls quickly."><input type="checkbox" data-overlay="atl"><span>ATL</span></label>
                 <label class="overlay-pill" style="--c:#a855f7" data-tooltip="TSB — Form / Freshness&#10;Formula: CTL − ATL&#10;Positive: fresh/tapered (race-ready).&#10;Negative: tired/absorbing training.&#10;Sweet spot for building fitness without injury: −10 to −30."><input type="checkbox" data-overlay="tsb"><span>TSB</span></label>
                 <label class="overlay-pill" style="--c:#4ade80"><input type="checkbox" data-overlay="restedness_am"><span>Restedness</span></label>
-                <label class="overlay-pill" style="--c:#f97316"><input type="checkbox" checked data-overlay="doms_am"><span>DOMS</span></label>
+                <label class="overlay-pill" style="--c:#06b6d4"><input type="checkbox" checked data-overlay="doms_am"><span>DOMS</span></label>
             </div>
         </div>
         <div class="control-group">
@@ -561,7 +560,7 @@
             { key: 'atl',            label: 'ATL Fatigue',  color: '#ef4444' },
             { key: 'tsb',            label: 'TSB Form',     color: '#a855f7' },
             { key: 'restedness_am',  label: 'Restedness',   color: '#4ade80' },
-            { key: 'doms_am',        label: 'DOMS',         color: '#f97316' }
+            { key: 'doms_am',        label: 'DOMS',         color: '#06b6d4' }
         ];
         // Default overlays match the checked pills above (Sleep + DOMS), with Weight handled separately
         let overlayOn = Object.fromEntries(OVERLAY_DEFS.map(o => [o.key, ['sleep_hours','doms_am'].includes(o.key)]));
@@ -891,6 +890,9 @@
             const ckByDate = Object.fromEntries(checkinData.filter(d => d.date >= start && d.date <= end).map(d => [d.date, d]));
             const ck = labels.map(date => ckByDate[date] || { date, sleep_source: null });
 
+            // Helper: take AM if present, else PM (Paul logs PM-only on many days)
+            const amOrPm = (d, k) => d[`${k}_am`] ?? d[`${k}_pm`] ?? null;
+
             // Restedness AM/PM vs Sleep hours (dual axis)
             if (restednessChart) restednessChart.destroy();
             restednessChart = lineChart('restednessChart', labels, [
@@ -908,31 +910,32 @@
                 moodGrid.style.gridTemplateColumns = `repeat(${Math.min(labels.length, 30)}, 1fr)`;
                 moodGrid.innerHTML = labels.map(date => {
                     const d = ckByDate[date];
-                    const v = d ? (d.mood_am ?? d.mood_pm ?? null) : null;
+                    const v = d ? amOrPm(d, 'mood') : null;
                     const lvl = v == null ? '' : Math.max(1, Math.min(5, Math.round(v)));
                     return `<div class="mood-cell" data-v="${lvl}" title="${date}: ${v ?? 'no data'}"></div>`;
                 }).join('');
             }
 
-            // Hunger vs Calories
+            // Hunger vs Calories — fall back to PM when AM is missing
             const calByDate = Object.fromEntries(allData.map(d => [d.date, d.calories]));
             if (hungerChart) hungerChart.destroy();
             hungerChart = lineChart('hungerChart', labels, [
-                { label: 'Hunger AM', data: ck.map(d => d.hunger_am ?? null), borderColor: '#f59e0b', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
+                { label: 'Hunger', data: ck.map(d => amOrPm(d, 'hunger')), borderColor: '#f59e0b', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
                 { label: 'Calories',  data: labels.map(date => calByDate[date] ?? null), borderColor: '#e94560', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'y2' }
             ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } }, y2: { beginAtZero: true } });
 
-            // Back stiffness — line, points red >3
+            // Back stiffness — line, points red >3 (AM-fallback-PM)
+            const backVals = ck.map(d => amOrPm(d, 'back_stiffness'));
             if (backChart) backChart.destroy();
             backChart = lineChart('backChart', labels, [
                 {
-                    label: 'Back Stiffness AM',
-                    data: ck.map(d => d.back_stiffness_am ?? null),
+                    label: 'Back Stiffness',
+                    data: backVals,
                     borderColor: '#a855f7',
                     backgroundColor: 'transparent',
                     borderWidth: 2,
-                    pointRadius: ck.map(d => (d.back_stiffness_am ?? 0) > 3 ? 4 : 1.5),
-                    pointBackgroundColor: ck.map(d => (d.back_stiffness_am ?? 0) > 3 ? '#ef4444' : '#a855f7'),
+                    pointRadius: backVals.map(v => (v ?? 0) > 3 ? 4 : 1.5),
+                    pointBackgroundColor: backVals.map(v => (v ?? 0) > 3 ? '#ef4444' : '#a855f7'),
                     spanGaps: true, tension: 0.3
                 }
             ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } } });
@@ -940,7 +943,7 @@
             // General Health
             if (generalHealthChart) generalHealthChart.destroy();
             generalHealthChart = lineChart('generalHealthChart', labels, [
-                { label: 'General Health AM', data: ck.map(d => d.general_health_am ?? null), borderColor: '#22d3ee', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 }
+                { label: 'General Health', data: ck.map(d => amOrPm(d, 'general_health')), borderColor: '#22d3ee', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 }
             ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } } });
 
             // Restedness AM→PM delta (negative = same-day fatigue) + sleep hours overlay
@@ -1363,9 +1366,21 @@
                             title: { display: true, text: 'Weight (lbs)', color: '#f472b6' },
                             display: weightData.length > 0 && showMacros.weight
                         },
+                        // Each overlay gets its own right-side y-axis. Visible only when
+                        // the overlay is toggled on, so the right margin only stacks axes
+                        // for what's actually plotted.
                         ...Object.fromEntries(OVERLAY_DEFS.map(def => [
                             'y_' + def.key,
-                            { position: 'right', display: false, grid: { drawOnChartArea: false } }
+                            {
+                                position: 'right',
+                                display: !!overlayOn[def.key],
+                                grid: { drawOnChartArea: false },
+                                ticks: { color: def.color, font: { size: 10 } },
+                                title: { display: true, text: def.label, color: def.color, font: { size: 10 } },
+                                // Sensible bounds per metric
+                                ...(['restedness_am','doms_am'].includes(def.key) ? { min: 0, max: 5 } : {}),
+                                ...(def.key === 'sleep_hours' ? { min: 0, max: 12 } : {})
+                            }
                         ]))
                     },
                     plugins: { legend: { labels: { color: '#eee' } } }
@@ -1395,7 +1410,7 @@
                             label: 'DOMS (AM, 0–5)',
                             data: tv.map(d => d.doms_am),
                             type: 'line',
-                            borderColor: '#f97316',
+                            borderColor: '#06b6d4',
                             backgroundColor: 'transparent',
                             borderWidth: 2,
                             pointRadius: 2,
@@ -1435,9 +1450,9 @@
                         yDoms: {
                             position: 'right',
                             min: 0, max: 5,
-                            ticks: { color: '#f97316', stepSize: 1 },
+                            ticks: { color: '#06b6d4', stepSize: 1 },
                             grid: { drawOnChartArea: false },
-                            title: { display: true, text: 'DOMS (0–5)', color: '#f97316' }
+                            title: { display: true, text: 'DOMS (0–5)', color: '#06b6d4' }
                         },
                         ySleep: {
                             position: 'right',
