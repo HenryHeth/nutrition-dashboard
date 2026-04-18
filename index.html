@@ -946,22 +946,12 @@
                 { label: 'General Health', data: ck.map(d => amOrPm(d, 'general_health')), borderColor: '#22d3ee', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 }
             ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } } });
 
-            // Restedness AM→PM delta (negative = same-day fatigue) + sleep hours overlay
-            // Δ logic:
-            //   - Both AM and PM logged → real delta (PM - AM)
-            //   - Only one logged → Δ = 0 (Paul checked in but no measurable change)
-            //   - Neither → null (no checkin)
-            // This shows a point on every checkin day instead of skipping single-checkin days.
+            // PM Restedness (fallback AM) vs Sleep hours
             if (restednessDeltaChart) restednessDeltaChart.destroy();
             restednessDeltaChart = lineChart('restednessDeltaChart', labels, [
                 {
-                    label: 'PM − AM',
-                    data: ck.map(d => {
-                        const am = d.restedness_am, pm = d.restedness_pm;
-                        if (am != null && pm != null) return pm - am;
-                        if (am != null || pm != null) return 0;
-                        return null;
-                    }),
+                    label: 'Restedness (PM, fallback AM)',
+                    data: ck.map(d => d.restedness_pm ?? d.restedness_am ?? null),
                     borderColor: '#4ade80',
                     backgroundColor: 'transparent',
                     borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3
@@ -974,7 +964,7 @@
                     borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3,
                     yAxisID: 'y2'
                 }
-            ], { y: { min: -4, max: 4, ticks: { stepSize: 1 } }, y2: { min: 0, max: 12 } });
+            ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } }, y2: { min: 0, max: 12 } });
         }
         
         // Check if question is an aggregation/count query
