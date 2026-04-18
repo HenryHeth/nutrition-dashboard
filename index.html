@@ -95,6 +95,33 @@
             border-color: var(--accent);
             color: white;
         }
+        .overlays-group { min-width: 0; }
+        .overlay-toggles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            max-width: 460px;
+        }
+        .overlay-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.78rem;
+            border-radius: 999px;
+            border: 1px solid #333;
+            background: var(--bg);
+            cursor: pointer;
+            color: #aaa;
+            user-select: none;
+        }
+        .overlay-pill input { display: none; }
+        .overlay-pill:has(input:checked) {
+            background: color-mix(in srgb, var(--c) 22%, transparent);
+            border-color: var(--c);
+            color: var(--c);
+            font-weight: 600;
+        }
         .checkbox-label {
             display: flex;
             align-items: center;
@@ -281,12 +308,17 @@
                 <button class="toggle-btn fat active" data-macro="fat">Fat</button>
             </div>
         </div>
-        <div class="control-group">
-            <label>Weight</label>
-            <label class="checkbox-label">
-                <input type="checkbox" id="weightToggle" checked>
-                <span>Show weight overlay</span>
-            </label>
+        <div class="control-group overlays-group">
+            <label>Overlays</label>
+            <div class="overlay-toggles">
+                <label class="overlay-pill" style="--c:#f472b6"><input type="checkbox" id="weightToggle" checked data-overlay="weight"><span>Weight</span></label>
+                <label class="overlay-pill" style="--c:#fb923c"><input type="checkbox" data-overlay="sleep_hours"><span>Sleep</span></label>
+                <label class="overlay-pill" style="--c:#60a5fa"><input type="checkbox" data-overlay="ctl"><span>CTL</span></label>
+                <label class="overlay-pill" style="--c:#ef4444"><input type="checkbox" data-overlay="atl"><span>ATL</span></label>
+                <label class="overlay-pill" style="--c:#a855f7"><input type="checkbox" data-overlay="tsb"><span>TSB</span></label>
+                <label class="overlay-pill" style="--c:#4ade80"><input type="checkbox" data-overlay="restedness_am"><span>Restedness</span></label>
+                <label class="overlay-pill" style="--c:#f97316"><input type="checkbox" data-overlay="doms_am"><span>DOMS</span></label>
+            </div>
         </div>
         <div class="control-group">
             <label>Quick</label>
@@ -366,8 +398,19 @@
     <script>
         let allData = [];
         let weightData = [];
+        let overlayData = [];   // [{date, sleep_hours, ctl, atl, tsb, restedness_am, doms_am}]
         let macroChart, trendChart;
         let showMacros = { protein: true, carbs: true, fat: true, weight: true };
+        // Spec §4b — extra line overlays. Default OFF; user toggles to reveal correlations.
+        const OVERLAY_DEFS = [
+            { key: 'sleep_hours',    label: 'Sleep (hrs)',  color: '#fb923c' },
+            { key: 'ctl',            label: 'CTL Fitness',  color: '#60a5fa' },
+            { key: 'atl',            label: 'ATL Fatigue',  color: '#ef4444' },
+            { key: 'tsb',            label: 'TSB Form',     color: '#a855f7' },
+            { key: 'restedness_am',  label: 'Restedness',   color: '#4ade80' },
+            { key: 'doms_am',        label: 'DOMS',         color: '#f97316' }
+        ];
+        let overlayOn = Object.fromEntries(OVERLAY_DEFS.map(o => [o.key, false]));
         
         // === AUTH ===
         let authToken = localStorage.getItem('nutrition_auth_token');
@@ -458,6 +501,20 @@
                 }
             } catch (e) {
                 console.log('No weight data available');
+            }
+        }
+
+        // Load overlay metrics (sleep / CTL / ATL / TSB / restedness / DOMS) — spec §4b
+        async function loadOverlayData() {
+            try {
+                const res = await fetch('/api/overlays', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    overlayData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
+                    console.log(`Loaded ${overlayData.length} overlay rows`);
+                }
+            } catch (e) {
+                console.log('Overlay endpoint not yet available — main chart will skip overlays');
             }
         }
         
@@ -645,6 +702,15 @@
                 showMacros.weight = e.target.checked;
                 updateCharts();
             });
+
+            // Overlay toggle pills (sleep / CTL / ATL / TSB / restedness / DOMS)
+            document.querySelectorAll('.overlay-pill input[data-overlay]').forEach(input => {
+                if (input.dataset.overlay === 'weight') return; // handled above
+                input.addEventListener('change', () => {
+                    overlayOn[input.dataset.overlay] = input.checked;
+                    updateCharts();
+                });
+            });
         }
         
         function clearQuickRangeActive() {
@@ -763,7 +829,7 @@
             if (weightData.length > 0 && showMacros.weight) {
                 const weightByDate = {};
                 weightData.forEach(w => weightByDate[w.date] = w.weight);
-                
+
                 // Interpolate weight for dates in range
                 const weightLine = labels.map(date => {
                     if (weightByDate[date]) return weightByDate[date];
@@ -771,7 +837,7 @@
                     const sorted = weightData.filter(w => w.date <= date).sort((a,b) => b.date.localeCompare(a.date));
                     return sorted[0]?.weight || null;
                 });
-                
+
                 datasets.push({
                     label: 'Weight (lbs)',
                     data: weightLine,
@@ -782,7 +848,34 @@
                     pointRadius: 2,
                     yAxisID: 'yWeight',
                     tension: 0.3,
-                    order: 0  // Draw on top of bars
+                    order: 0
+                });
+            }
+
+            // Spec §4b — toggleable line overlays (sleep / CTL / ATL / TSB / restedness / DOMS)
+            // Each overlay renders on its own y-axis (display:false) so scales don't fight.
+            // Goal is visual correlation, not exact reading — values are in tooltips.
+            const overlayByDate = {};
+            overlayData.forEach(r => overlayByDate[r.date] = r);
+            for (const def of OVERLAY_DEFS) {
+                if (!overlayOn[def.key]) continue;
+                const series = labels.map(date => {
+                    const r = overlayByDate[date];
+                    return r && r[def.key] != null ? r[def.key] : null;
+                });
+                if (series.every(v => v == null)) continue;  // no data — skip silently
+                datasets.push({
+                    label: def.label,
+                    data: series,
+                    type: 'line',
+                    borderColor: def.color,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 1.5,
+                    yAxisID: 'y_' + def.key,
+                    spanGaps: true,
+                    tension: 0.3,
+                    order: 0
                 });
             }
             
@@ -809,7 +902,11 @@
                             grid: { drawOnChartArea: false },
                             title: { display: true, text: 'Weight (lbs)', color: '#f472b6' },
                             display: weightData.length > 0 && showMacros.weight
-                        }
+                        },
+                        ...Object.fromEntries(OVERLAY_DEFS.map(def => [
+                            'y_' + def.key,
+                            { position: 'right', display: false, grid: { drawOnChartArea: false } }
+                        ]))
                     },
                     plugins: { legend: { labels: { color: '#eee' } } }
                 }
@@ -906,8 +1003,8 @@
         (async () => {
             const authed = await checkAuth();
             if (!authed) return; // Login form shown
-            
-            await loadWeightData();
+
+            await Promise.all([loadWeightData(), loadOverlayData()]);
             await loadData();
             initResizeHandles();
         })();
