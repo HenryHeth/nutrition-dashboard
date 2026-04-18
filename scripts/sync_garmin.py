@@ -47,14 +47,16 @@ def get_client():
 
 
 def categorize(name: str) -> str:
-    n = (name or "").lower()
-    if any(k in n for k in ("bench", "push-up", "pushup", "overhead", "shoulder press", "dip")):
+    # Normalize: lowercase + collapse all hyphens/underscores/whitespace to spaces
+    import re
+    n = re.sub(r"[\s_\-]+", " ", (name or "").lower()).strip()
+    if any(k in n for k in ("bench", "push up", "overhead", "shoulder press", "dip", "press", "fly")):
         return "upper_push"
-    if any(k in n for k in ("pull-up", "pullup", "chin-up", "chinup", "row", "lat pull", "dead hang", "curl")):
+    if any(k in n for k in ("pull up", "chin up", "row", "lat pull", "dead hang", "curl", "pulldown")):
         return "upper_pull"
-    if any(k in n for k in ("squat", "deadlift", "lunge", "leg press", "calf", "hip thrust", "rdl")):
+    if any(k in n for k in ("squat", "deadlift", "lunge", "leg press", "calf", "hip thrust", "rdl", "leg curl", "leg extension")):
         return "lower"
-    if any(k in n for k in ("plank", "crunch", "sit-up", "situp", "ab ", "core")):
+    if any(k in n for k in ("plank", "crunch", "sit up", "ab ", "core", "russian twist")):
         return "core"
     return "other"
 
@@ -64,15 +66,19 @@ def sync(conn, client):
     start = end - timedelta(days=WINDOW_DAYS)
     rows_written = 0
 
-    # 1) Weight
+    # 1) Weight — write to BOTH the legacy `weight` table (drives existing /api/weight)
+    #    AND the new `body_composition` table.
     print(f"Fetching weight {start}..{end}", file=sys.stderr)
     try:
+        # Garmin returns kg / grams depending on endpoint variant — assume kg here
         wd = client.get_weigh_ins(start.isoformat(), end.isoformat()) or {}
         for entry in wd.get("dailyWeightSummaries", []) or []:
-            w_kg = entry.get("startWeight") or entry.get("highWeight")
+            w_g = entry.get("startWeight") or entry.get("highWeight")
             day = entry.get("summaryDate")
-            if not (w_kg and day):
+            if not (w_g and day):
                 continue
+            # garminconnect returns weight in grams
+            w_kg = float(w_g) / 1000.0 if w_g > 1000 else float(w_g)
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -81,7 +87,22 @@ def sync(conn, client):
                     ON CONFLICT (date, source) DO UPDATE
                       SET weight_kg = EXCLUDED.weight_kg, raw = EXCLUDED.raw
                     """,
-                    (day, float(w_kg), Json(entry)),
+                    (day, w_kg, Json(entry)),
+                )
+                # Mirror to legacy `weight` table — UPSERT by date (idempotent)
+                cur.execute(
+                    """
+                    INSERT INTO weight (date, weight_kg, source) VALUES (%s, %s, 'garmin')
+                    ON CONFLICT DO NOTHING
+                    """,
+                    (day, w_kg),
+                )
+                # Replace if a different value exists for the same day from garmin
+                cur.execute(
+                    """
+                    UPDATE weight SET weight_kg = %s WHERE date = %s AND source = 'garmin'
+                    """,
+                    (w_kg, day),
                 )
             rows_written += 1
     except Exception as e:
