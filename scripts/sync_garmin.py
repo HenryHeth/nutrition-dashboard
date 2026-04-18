@@ -25,7 +25,7 @@ import psycopg2
 from psycopg2.extras import Json
 from garminconnect import Garmin
 
-WINDOW_DAYS = 14   # daily run also backfills the prior 13 days
+WINDOW_DAYS = int(os.environ.get("GARMIN_WINDOW_DAYS", "60"))   # daily run backfills the prior N-1 days
 TOKEN_DIR = os.path.expanduser("~/.garth")
 
 
@@ -73,11 +73,13 @@ def sync(conn, client):
         # Garmin returns kg / grams depending on endpoint variant — assume kg here
         wd = client.get_weigh_ins(start.isoformat(), end.isoformat()) or {}
         for entry in wd.get("dailyWeightSummaries", []) or []:
-            w_g = entry.get("startWeight") or entry.get("highWeight")
-            day = entry.get("summaryDate")
+            # Garmin response uses {latestWeight:{weight}, minWeight, maxWeight} — all in grams.
+            latest = entry.get("latestWeight") or {}
+            w_g = latest.get("weight") or entry.get("maxWeight") or entry.get("minWeight") \
+                  or entry.get("startWeight") or entry.get("highWeight")
+            day = entry.get("summaryDate") or latest.get("calendarDate")
             if not (w_g and day):
                 continue
-            # garminconnect returns weight in grams
             w_kg = float(w_g) / 1000.0 if w_g > 1000 else float(w_g)
             with conn.cursor() as cur:
                 cur.execute(
