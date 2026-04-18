@@ -382,8 +382,8 @@
         <div class="control-group">
             <label>Aggregate</label>
             <select id="aggregate">
-                <option value="day">Daily</option>
-                <option value="week" selected>Weekly</option>
+                <option value="day" selected>Daily</option>
+                <option value="week">Weekly</option>
                 <option value="month">Monthly</option>
             </select>
         </div>
@@ -399,20 +399,20 @@
             <label>Overlays</label>
             <div class="overlay-toggles">
                 <label class="overlay-pill" style="--c:#f472b6"><input type="checkbox" id="weightToggle" checked data-overlay="weight"><span>Weight</span></label>
-                <label class="overlay-pill" style="--c:#fb923c"><input type="checkbox" data-overlay="sleep_hours"><span>Sleep</span></label>
+                <label class="overlay-pill" style="--c:#fb923c"><input type="checkbox" checked data-overlay="sleep_hours"><span>Sleep</span></label>
                 <label class="overlay-pill" style="--c:#60a5fa" data-tooltip="CTL — Fitness&#10;42-day rolling average of daily TSS.&#10;Your 'engine size': builds slowly, drops slowly. Higher CTL means your body can handle more work."><input type="checkbox" data-overlay="ctl"><span>CTL</span></label>
                 <label class="overlay-pill" style="--c:#ef4444" data-tooltip="ATL — Fatigue&#10;7-day rolling average of daily TSS.&#10;The cost of recent training (like a big ski week). Rises and falls quickly."><input type="checkbox" data-overlay="atl"><span>ATL</span></label>
                 <label class="overlay-pill" style="--c:#a855f7" data-tooltip="TSB — Form / Freshness&#10;Formula: CTL − ATL&#10;Positive: fresh/tapered (race-ready).&#10;Negative: tired/absorbing training.&#10;Sweet spot for building fitness without injury: −10 to −30."><input type="checkbox" data-overlay="tsb"><span>TSB</span></label>
                 <label class="overlay-pill" style="--c:#4ade80"><input type="checkbox" data-overlay="restedness_am"><span>Restedness</span></label>
-                <label class="overlay-pill" style="--c:#f97316"><input type="checkbox" data-overlay="doms_am"><span>DOMS</span></label>
+                <label class="overlay-pill" style="--c:#f97316"><input type="checkbox" checked data-overlay="doms_am"><span>DOMS</span></label>
             </div>
         </div>
         <div class="control-group">
             <label>Quick</label>
             <div id="quickRange" class="quick-range-group">
-                <button class="quick-btn" data-days="14">14D</button>
+                <button class="quick-btn active" data-days="14">14D</button>
                 <button class="quick-btn" data-days="30">30D</button>
-                <button class="quick-btn active" data-days="60">60D</button>
+                <button class="quick-btn" data-days="60">60D</button>
                 <button class="quick-btn" data-days="90">90D</button>
                 <button class="quick-btn" data-days="365">1Y</button>
             </div>
@@ -465,7 +465,7 @@
 
     <!-- Habit compliance grid — spec §4g -->
     <div class="chart-container">
-        <div class="chart-title">Habit Compliance — last 60 days <span class="sub">spec §4g</span></div>
+        <div class="chart-title"><span id="habitGridTitle">Habit Compliance</span> <span class="sub">spec §4g</span></div>
         <div id="habitGrid" class="habit-grid"></div>
     </div>
 
@@ -495,7 +495,7 @@
             <div class="chart-wrapper small"><canvas id="restednessChart"></canvas></div>
         </div>
         <div class="chart-container small-chart">
-            <div class="chart-title">Mood — last 60 days <span class="sub">overtraining EWS</span></div>
+            <div class="chart-title"><span id="moodGridTitle">Mood</span> <span class="sub">overtraining EWS</span></div>
             <div id="moodGrid" class="mood-grid"></div>
         </div>
         <div class="chart-container small-chart">
@@ -563,7 +563,8 @@
             { key: 'restedness_am',  label: 'Restedness',   color: '#4ade80' },
             { key: 'doms_am',        label: 'DOMS',         color: '#f97316' }
         ];
-        let overlayOn = Object.fromEntries(OVERLAY_DEFS.map(o => [o.key, false]));
+        // Default overlays match the checked pills above (Sleep + DOMS), with Weight handled separately
+        let overlayOn = Object.fromEntries(OVERLAY_DEFS.map(o => [o.key, ['sleep_hours','doms_am'].includes(o.key)]));
         
         // === AUTH ===
         let authToken = localStorage.getItem('nutrition_auth_token');
@@ -685,10 +686,16 @@
             }
         }
 
-        // Load habit compliance (last 60 days) — spec §4g
+        // Load habit compliance — follows the date picker range
         async function loadHabits() {
             try {
-                const res = await fetch('/api/fitness/habits?days=60', { headers: getAuthHeaders() });
+                const start = document.getElementById('startDate')?.value;
+                const end   = document.getElementById('endDate')?.value;
+                let days = 14;
+                if (start && end) {
+                    days = Math.max(1, Math.round((new Date(end) - new Date(start)) / 86400000) + 1);
+                }
+                const res = await fetch(`/api/fitness/habits?days=${days}`, { headers: getAuthHeaders() });
                 if (res.ok) {
                     const json = await res.json();
                     renderHabitGrid(json.dates || [], json.rows || []);
@@ -701,9 +708,16 @@
         function renderHabitGrid(dates, rows) {
             const grid = document.getElementById('habitGrid');
             if (!grid) return;
+            // Update grid title with current range
+            const titleEl = document.getElementById('habitGridTitle');
+            if (titleEl && dates.length) {
+                titleEl.textContent = `Habit Compliance — ${dates.length} days`;
+            }
+            // Match column count to # days so each cell stays a usable square
+            grid.style.setProperty('--cols', dates.length);
             grid.innerHTML = rows.map(row => `
                 <div class="habit-row-label">${row.label}</div>
-                <div class="habit-row-cells">
+                <div class="habit-row-cells" style="grid-template-columns: repeat(${dates.length}, 1fr)">
                     ${row.hits.map((s, i) => {
                         const cls = s === 'hit' ? 'hit' : s === 'miss' ? 'miss' : '';
                         const tip = `${dates[i]}: ${s.replace('_', ' ')}`;
@@ -858,26 +872,45 @@
             });
         }
 
+        // Build a contiguous list of YYYY-MM-DD dates between start and end (inclusive)
+        function dateRange(start, end) {
+            const out = [];
+            const cur = new Date(start);
+            const stop = new Date(end);
+            while (cur <= stop) { out.push(cur.toISOString().slice(0,10)); cur.setUTCDate(cur.getUTCDate() + 1); }
+            return out;
+        }
+
         function renderSignalCheckSection() {
-            const ck = filteredCheckins();
-            const labels = ck.map(d => d.date);
+            const start = document.getElementById('startDate').value;
+            const end   = document.getElementById('endDate').value;
+
+            // Labels span the FULL date picker range so charts always show every day,
+            // not just dates where SignalCheck logged a checkin.
+            const labels = dateRange(start, end);
+            const ckByDate = Object.fromEntries(checkinData.filter(d => d.date >= start && d.date <= end).map(d => [d.date, d]));
+            const ck = labels.map(date => ckByDate[date] || { date, sleep_source: null });
 
             // Restedness AM/PM vs Sleep hours (dual axis)
             if (restednessChart) restednessChart.destroy();
             restednessChart = lineChart('restednessChart', labels, [
-                { label: 'Restedness AM', data: ck.map(d => d.restedness_am), borderColor: '#4ade80', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
-                { label: 'Restedness PM', data: ck.map(d => d.restedness_pm), borderColor: '#86efac', borderDash: [4,4], backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
-                { label: `Sleep (${prettySleepSource(ck)} hrs)`, data: ck.map(d => d.sleep_hours), borderColor: '#fb923c', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'y2' }
+                { label: 'Restedness AM', data: ck.map(d => d.restedness_am ?? null), borderColor: '#4ade80', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
+                { label: 'Restedness PM', data: ck.map(d => d.restedness_pm ?? null), borderColor: '#86efac', borderDash: [4,4], backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
+                { label: `Sleep (${prettySleepSource(ck)} hrs)`, data: ck.map(d => d.sleep_hours ?? null), borderColor: '#fb923c', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'y2' }
             ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } }, y2: { min: 0, max: 12 } });
 
-            // Mood — GitHub-style 60-day grid
+            // Mood — GitHub-style grid following the date picker range
             const moodGrid = document.getElementById('moodGrid');
+            const moodTitle = document.getElementById('moodGridTitle');
             if (moodGrid) {
-                const last60 = checkinData.slice(-60);
-                moodGrid.innerHTML = last60.map(d => {
-                    const v = d.mood_am ?? d.mood_pm ?? null;
+                if (moodTitle) moodTitle.textContent = `Mood — ${labels.length} days`;
+                // Match column count to # days so cells stay readable squares
+                moodGrid.style.gridTemplateColumns = `repeat(${Math.min(labels.length, 30)}, 1fr)`;
+                moodGrid.innerHTML = labels.map(date => {
+                    const d = ckByDate[date];
+                    const v = d ? (d.mood_am ?? d.mood_pm ?? null) : null;
                     const lvl = v == null ? '' : Math.max(1, Math.min(5, Math.round(v)));
-                    return `<div class="mood-cell" data-v="${lvl}" title="${d.date}: ${v ?? 'no data'}"></div>`;
+                    return `<div class="mood-cell" data-v="${lvl}" title="${date}: ${v ?? 'no data'}"></div>`;
                 }).join('');
             }
 
@@ -885,8 +918,8 @@
             const calByDate = Object.fromEntries(allData.map(d => [d.date, d.calories]));
             if (hungerChart) hungerChart.destroy();
             hungerChart = lineChart('hungerChart', labels, [
-                { label: 'Hunger AM', data: ck.map(d => d.hunger_am), borderColor: '#f59e0b', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
-                { label: 'Calories',  data: ck.map(d => calByDate[d.date] ?? null), borderColor: '#e94560', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'y2' }
+                { label: 'Hunger AM', data: ck.map(d => d.hunger_am ?? null), borderColor: '#f59e0b', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
+                { label: 'Calories',  data: labels.map(date => calByDate[date] ?? null), borderColor: '#e94560', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'y2' }
             ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } }, y2: { beginAtZero: true } });
 
             // Back stiffness — line, points red >3
@@ -894,7 +927,7 @@
             backChart = lineChart('backChart', labels, [
                 {
                     label: 'Back Stiffness AM',
-                    data: ck.map(d => d.back_stiffness_am),
+                    data: ck.map(d => d.back_stiffness_am ?? null),
                     borderColor: '#a855f7',
                     backgroundColor: 'transparent',
                     borderWidth: 2,
@@ -907,10 +940,10 @@
             // General Health
             if (generalHealthChart) generalHealthChart.destroy();
             generalHealthChart = lineChart('generalHealthChart', labels, [
-                { label: 'General Health AM', data: ck.map(d => d.general_health_am), borderColor: '#22d3ee', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 }
+                { label: 'General Health AM', data: ck.map(d => d.general_health_am ?? null), borderColor: '#22d3ee', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 }
             ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } } });
 
-            // Restedness AM→PM delta (negative = same-day fatigue) + sleep score overlay
+            // Restedness AM→PM delta (negative = same-day fatigue) + sleep hours overlay
             if (restednessDeltaChart) restednessDeltaChart.destroy();
             restednessDeltaChart = lineChart('restednessDeltaChart', labels, [
                 {
@@ -922,7 +955,7 @@
                 },
                 {
                     label: `Sleep (${prettySleepSource(ck)} hrs)`,
-                    data: ck.map(d => d.sleep_hours),
+                    data: ck.map(d => d.sleep_hours ?? null),
                     borderColor: '#fb923c',
                     backgroundColor: 'transparent',
                     borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3,
@@ -1082,21 +1115,22 @@
             document.getElementById('endDate').min = minDate;
             document.getElementById('endDate').max = maxDate;
             
-            // Default to last 60 days (spec §4a)
-            setQuickRange(60);
+            // Default to last 14 days (per Paul's preference; was 60)
+            setQuickRange(14);
 
-            // Event listeners
+            // Event listeners — habit grid follows date picker too
+            const onRangeChange = () => { updateCharts(); loadHabits(); };
             document.getElementById('startDate').addEventListener('change', () => {
                 clearQuickRangeActive();
-                updateCharts();
+                onRangeChange();
             });
             document.getElementById('endDate').addEventListener('change', () => {
                 clearQuickRangeActive();
-                updateCharts();
+                onRangeChange();
             });
             document.getElementById('aggregate').addEventListener('change', updateCharts);
             document.querySelectorAll('.quick-btn').forEach(btn => {
-                btn.addEventListener('click', () => setQuickRange(btn.dataset.days));
+                btn.addEventListener('click', () => { setQuickRange(btn.dataset.days); loadHabits(); });
             });
             
             // Macro toggles (buttons)
