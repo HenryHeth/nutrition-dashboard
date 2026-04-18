@@ -103,6 +103,7 @@
             max-width: 460px;
         }
         .overlay-pill {
+            position: relative;
             display: inline-flex;
             align-items: center;
             gap: 0.35rem;
@@ -121,6 +122,27 @@
             border-color: var(--c);
             color: var(--c);
             font-weight: 600;
+        }
+        .overlay-pill[data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: 280px;
+            padding: 0.65rem 0.8rem;
+            background: #0d0d1c;
+            color: #eee;
+            border: 1px solid var(--c, #333);
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 400;
+            line-height: 1.45;
+            text-align: left;
+            white-space: pre-line;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+            pointer-events: none;
+            z-index: 1000;
         }
         .section-title {
             margin: 1.5rem 0 0.5rem;
@@ -378,9 +400,9 @@
             <div class="overlay-toggles">
                 <label class="overlay-pill" style="--c:#f472b6"><input type="checkbox" id="weightToggle" checked data-overlay="weight"><span>Weight</span></label>
                 <label class="overlay-pill" style="--c:#fb923c"><input type="checkbox" data-overlay="sleep_hours"><span>Sleep</span></label>
-                <label class="overlay-pill" style="--c:#60a5fa"><input type="checkbox" data-overlay="ctl"><span>CTL</span></label>
-                <label class="overlay-pill" style="--c:#ef4444"><input type="checkbox" data-overlay="atl"><span>ATL</span></label>
-                <label class="overlay-pill" style="--c:#a855f7"><input type="checkbox" data-overlay="tsb"><span>TSB</span></label>
+                <label class="overlay-pill" style="--c:#60a5fa" data-tooltip="CTL — Fitness&#10;42-day rolling average of daily TSS.&#10;Your 'engine size': builds slowly, drops slowly. Higher CTL means your body can handle more work."><input type="checkbox" data-overlay="ctl"><span>CTL</span></label>
+                <label class="overlay-pill" style="--c:#ef4444" data-tooltip="ATL — Fatigue&#10;7-day rolling average of daily TSS.&#10;The cost of recent training (like a big ski week). Rises and falls quickly."><input type="checkbox" data-overlay="atl"><span>ATL</span></label>
+                <label class="overlay-pill" style="--c:#a855f7" data-tooltip="TSB — Form / Freshness&#10;Formula: CTL − ATL&#10;Positive: fresh/tapered (race-ready).&#10;Negative: tired/absorbing training.&#10;Sweet spot for building fitness without injury: −10 to −30."><input type="checkbox" data-overlay="tsb"><span>TSB</span></label>
                 <label class="overlay-pill" style="--c:#4ade80"><input type="checkbox" data-overlay="restedness_am"><span>Restedness</span></label>
                 <label class="overlay-pill" style="--c:#f97316"><input type="checkbox" data-overlay="doms_am"><span>DOMS</span></label>
             </div>
