@@ -122,6 +122,47 @@
             color: var(--c);
             font-weight: 600;
         }
+        .section-title {
+            margin: 1.5rem 0 0.5rem;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #ddd;
+            border-left: 3px solid var(--accent);
+            padding-left: 0.5rem;
+        }
+        .signal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .small-chart .chart-wrapper.small {
+            height: 220px;
+            padding: 0.5rem;
+        }
+        .chart-title .sub {
+            color: #888;
+            font-weight: 400;
+            font-size: 0.8rem;
+            margin-left: 0.5rem;
+        }
+        .mood-grid {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            gap: 3px;
+            padding: 0.75rem;
+            min-height: 220px;
+        }
+        .mood-cell {
+            aspect-ratio: 1;
+            border-radius: 3px;
+            background: #2a2a3a;
+        }
+        .mood-cell[data-v="1"] { background: #5b1d1d; }
+        .mood-cell[data-v="2"] { background: #8a3a1f; }
+        .mood-cell[data-v="3"] { background: #8a7a1f; }
+        .mood-cell[data-v="4"] { background: #3d8a3a; }
+        .mood-cell[data-v="5"] { background: #4ade80; }
         .checkbox-label {
             display: flex;
             align-items: center;
@@ -376,6 +417,35 @@
         <div class="resize-handle" data-target="domsVolumeWrapper"></div>
     </div>
 
+    <!-- SignalCheck subjective overlays — spec §4d -->
+    <div class="section-title">SignalCheck — Subjective Wellbeing</div>
+    <div class="signal-grid">
+        <div class="chart-container small-chart">
+            <div class="chart-title">Restedness vs Sleep <span class="sub">felt vs measured</span></div>
+            <div class="chart-wrapper small"><canvas id="restednessChart"></canvas></div>
+        </div>
+        <div class="chart-container small-chart">
+            <div class="chart-title">Mood — last 60 days <span class="sub">overtraining EWS</span></div>
+            <div id="moodGrid" class="mood-grid"></div>
+        </div>
+        <div class="chart-container small-chart">
+            <div class="chart-title">Hunger vs Calories <span class="sub">under/over-eating signal</span></div>
+            <div class="chart-wrapper small"><canvas id="hungerChart"></canvas></div>
+        </div>
+        <div class="chart-container small-chart">
+            <div class="chart-title">Back Stiffness <span class="sub">flagged > 3</span></div>
+            <div class="chart-wrapper small"><canvas id="backChart"></canvas></div>
+        </div>
+        <div class="chart-container small-chart">
+            <div class="chart-title">General Health <span class="sub">unexplained-dip context</span></div>
+            <div class="chart-wrapper small"><canvas id="generalHealthChart"></canvas></div>
+        </div>
+        <div class="chart-container small-chart">
+            <div class="chart-title">Restedness AM→PM Δ <span class="sub">same-day fatigue signal</span></div>
+            <div class="chart-wrapper small"><canvas id="restednessDeltaChart"></canvas></div>
+        </div>
+    </div>
+
     <div class="chat-container">
         <div class="chat-header">
             <span>🤖</span>
@@ -408,7 +478,9 @@
         let weightData = [];
         let overlayData = [];   // [{date, sleep_hours, ctl, atl, tsb, restedness_am, doms_am}]
         let trainingVolumeData = [];  // [{date, volume_lbs, doms_am}]
+        let checkinData = [];  // [{date, restedness_am/pm, mood_am/pm, ..., sleep_score}]
         let macroChart, trendChart, domsVolumeChart;
+        let restednessChart, hungerChart, backChart, generalHealthChart, restednessDeltaChart;
         let showMacros = { protein: true, carbs: true, fat: true, weight: true };
         // Spec §4b — extra line overlays. Default OFF; user toggles to reveal correlations.
         const OVERLAY_DEFS = [
@@ -539,6 +611,109 @@
             } catch (e) {
                 console.log('Training-volume endpoint not yet available');
             }
+        }
+
+        // Load SignalCheck checkins (AM/PM pivot) + sleep_score — spec §4d
+        async function loadCheckinData() {
+            try {
+                const res = await fetch('/api/checkins', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    checkinData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
+                    console.log(`Loaded ${checkinData.length} checkin rows`);
+                }
+            } catch (e) {
+                console.log('Checkins endpoint not yet available');
+            }
+        }
+
+        function filteredCheckins() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            return checkinData.filter(d => d.date >= start && d.date <= end);
+        }
+
+        function lineChart(canvasId, labels, datasets, opts = {}) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return null;
+            return new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#aaa', maxTicksLimit: 8 }, grid: { color: '#222' } },
+                        y: Object.assign({ ticks: { color: '#aaa' }, grid: { color: '#222' } }, opts.y || {}),
+                        ...(opts.y2 ? { y2: Object.assign({ position: 'right', ticks: { color: '#aaa' }, grid: { drawOnChartArea: false } }, opts.y2) } : {})
+                    },
+                    plugins: { legend: { labels: { color: '#ddd', boxWidth: 12, font: { size: 10 } } } }
+                }
+            });
+        }
+
+        function renderSignalCheckSection() {
+            const ck = filteredCheckins();
+            const labels = ck.map(d => d.date);
+
+            // Restedness AM/PM vs Sleep score (dual axis)
+            if (restednessChart) restednessChart.destroy();
+            restednessChart = lineChart('restednessChart', labels, [
+                { label: 'Restedness AM', data: ck.map(d => d.restedness_am), borderColor: '#4ade80', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
+                { label: 'Restedness PM', data: ck.map(d => d.restedness_pm), borderColor: '#86efac', borderDash: [4,4], backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
+                { label: 'Sleep score',   data: ck.map(d => d.sleep_score),   borderColor: '#fb923c', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'y2' }
+            ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } }, y2: { min: 0, max: 100 } });
+
+            // Mood — GitHub-style 60-day grid
+            const moodGrid = document.getElementById('moodGrid');
+            if (moodGrid) {
+                const last60 = checkinData.slice(-60);
+                moodGrid.innerHTML = last60.map(d => {
+                    const v = d.mood_am ?? d.mood_pm ?? null;
+                    const lvl = v == null ? '' : Math.max(1, Math.min(5, Math.round(v)));
+                    return `<div class="mood-cell" data-v="${lvl}" title="${d.date}: ${v ?? 'no data'}"></div>`;
+                }).join('');
+            }
+
+            // Hunger vs Calories
+            const calByDate = Object.fromEntries(allData.map(d => [d.date, d.calories]));
+            if (hungerChart) hungerChart.destroy();
+            hungerChart = lineChart('hungerChart', labels, [
+                { label: 'Hunger AM', data: ck.map(d => d.hunger_am), borderColor: '#f59e0b', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
+                { label: 'Calories',  data: ck.map(d => calByDate[d.date] ?? null), borderColor: '#e94560', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'y2' }
+            ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } }, y2: { beginAtZero: true } });
+
+            // Back stiffness — line, points red >3
+            if (backChart) backChart.destroy();
+            backChart = lineChart('backChart', labels, [
+                {
+                    label: 'Back Stiffness AM',
+                    data: ck.map(d => d.back_stiffness_am),
+                    borderColor: '#a855f7',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: ck.map(d => (d.back_stiffness_am ?? 0) > 3 ? 4 : 1.5),
+                    pointBackgroundColor: ck.map(d => (d.back_stiffness_am ?? 0) > 3 ? '#ef4444' : '#a855f7'),
+                    spanGaps: true, tension: 0.3
+                }
+            ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } } });
+
+            // General Health
+            if (generalHealthChart) generalHealthChart.destroy();
+            generalHealthChart = lineChart('generalHealthChart', labels, [
+                { label: 'General Health AM', data: ck.map(d => d.general_health_am), borderColor: '#22d3ee', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 }
+            ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } } });
+
+            // Restedness AM→PM delta (negative = same-day fatigue)
+            if (restednessDeltaChart) restednessDeltaChart.destroy();
+            restednessDeltaChart = lineChart('restednessDeltaChart', labels, [
+                {
+                    label: 'PM − AM',
+                    data: ck.map(d => (d.restedness_am != null && d.restedness_pm != null) ? (d.restedness_pm - d.restedness_am) : null),
+                    borderColor: '#4ade80',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3
+                }
+            ], { y: { min: -4, max: 4, ticks: { stepSize: 1 } } });
         }
         
         // Check if question is an aggregation/count query
@@ -992,6 +1167,9 @@
                 }
             });
 
+            // SignalCheck mini-charts (spec §4d)
+            renderSignalCheckSection();
+
             // Trend chart (calories + protein)
             if (trendChart) trendChart.destroy();
             trendChart = new Chart(document.getElementById('trendChart'), {
@@ -1084,7 +1262,7 @@
             const authed = await checkAuth();
             if (!authed) return; // Login form shown
 
-            await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData()]);
+            await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData(), loadCheckinData()]);
             await loadData();
             initResizeHandles();
         })();
