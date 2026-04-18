@@ -76,6 +76,25 @@
         .toggle-btn.carbs { background: var(--carbs); color: #000; }
         .toggle-btn.fat { background: var(--fat); color: #000; }
         .toggle-btn.inactive { opacity: 0.3; }
+        .quick-range-group {
+            display: flex;
+            gap: 0.25rem;
+        }
+        .quick-btn {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+            background: var(--bg);
+            border: 1px solid #333;
+            color: var(--text);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .quick-btn:hover { border-color: var(--accent); }
+        .quick-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
         .checkbox-label {
             display: flex;
             align-items: center;
@@ -271,14 +290,13 @@
         </div>
         <div class="control-group">
             <label>Quick</label>
-            <select id="quickRange">
-                <option value="">Custom</option>
-                <option value="7">Last 7 days</option>
-                <option value="30">Last 30 days</option>
-                <option value="90">Last 90 days</option>
-                <option value="365" selected>Last year</option>
-                <option value="all">All time</option>
-            </select>
+            <div id="quickRange" class="quick-range-group">
+                <button class="quick-btn" data-days="14">14D</button>
+                <button class="quick-btn" data-days="30">30D</button>
+                <button class="quick-btn active" data-days="60">60D</button>
+                <button class="quick-btn" data-days="90">90D</button>
+                <button class="quick-btn" data-days="365">1Y</button>
+            </div>
         </div>
         <div class="control-group">
             <label>Data</label>
@@ -594,21 +612,21 @@
             document.getElementById('endDate').min = minDate;
             document.getElementById('endDate').max = maxDate;
             
-            // Default to last year
-            setQuickRange(365);
-            
+            // Default to last 60 days (spec §4a)
+            setQuickRange(60);
+
             // Event listeners
             document.getElementById('startDate').addEventListener('change', () => {
-                document.getElementById('quickRange').value = '';
+                clearQuickRangeActive();
                 updateCharts();
             });
             document.getElementById('endDate').addEventListener('change', () => {
-                document.getElementById('quickRange').value = '';
+                clearQuickRangeActive();
                 updateCharts();
             });
             document.getElementById('aggregate').addEventListener('change', updateCharts);
-            document.getElementById('quickRange').addEventListener('change', (e) => {
-                if (e.target.value) setQuickRange(e.target.value);
+            document.querySelectorAll('.quick-btn').forEach(btn => {
+                btn.addEventListener('click', () => setQuickRange(btn.dataset.days));
             });
             
             // Macro toggles (buttons)
@@ -629,20 +647,23 @@
             });
         }
         
+        function clearQuickRangeActive() {
+            document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+        }
+
         function setQuickRange(days) {
             const end = allData[allData.length - 1]?.date;
-            let start;
-            
-            if (days === 'all') {
-                start = allData[0]?.date;
-            } else {
-                const d = new Date(end);
-                d.setDate(d.getDate() - parseInt(days));
-                start = d.toISOString().split('T')[0];
-            }
-            
+            const d = new Date(end);
+            d.setDate(d.getDate() - parseInt(days));
+            const start = d.toISOString().split('T')[0];
+
             document.getElementById('startDate').value = start;
             document.getElementById('endDate').value = end;
+
+            clearQuickRangeActive();
+            const btn = document.querySelector(`.quick-btn[data-days="${days}"]`);
+            if (btn) btn.classList.add('active');
+
             updateCharts();
         }
         
