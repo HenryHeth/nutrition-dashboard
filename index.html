@@ -1117,6 +1117,7 @@
             
             // Default to last 14 days (per Paul's preference; was 60)
             setQuickRange(14);
+            loadHabits();   // now that the picker has dates set
 
             // Event listeners — habit grid follows date picker too
             const onRangeChange = () => { updateCharts(); loadHabits(); };
@@ -1550,7 +1551,9 @@
             const authed = await checkAuth();
             if (!authed) return; // Login form shown
 
-            await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData(), loadCheckinData(), loadWeeklyVolumeData(), loadBodyCompData(), loadHabits()]);
+            // Habit grid loads AFTER setQuickRange (in initControls() via loadData) so it
+            // reads the picker range, not the empty default. Triggered explicitly there.
+            await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData(), loadCheckinData(), loadWeeklyVolumeData(), loadBodyCompData()]);
             await loadData();
             initResizeHandles();
         })();
