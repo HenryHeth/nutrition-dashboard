@@ -873,7 +873,7 @@
                 { label: 'General Health AM', data: ck.map(d => d.general_health_am), borderColor: '#22d3ee', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 }
             ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } } });
 
-            // Restedness AM→PM delta (negative = same-day fatigue)
+            // Restedness AM→PM delta (negative = same-day fatigue) + sleep score overlay
             if (restednessDeltaChart) restednessDeltaChart.destroy();
             restednessDeltaChart = lineChart('restednessDeltaChart', labels, [
                 {
@@ -882,8 +882,16 @@
                     borderColor: '#4ade80',
                     backgroundColor: 'transparent',
                     borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3
+                },
+                {
+                    label: 'Sleep score',
+                    data: ck.map(d => d.sleep_score),
+                    borderColor: '#fb923c',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3,
+                    yAxisID: 'y2'
                 }
-            ], { y: { min: -4, max: 4, ticks: { stepSize: 1 } } });
+            ], { y: { min: -4, max: 4, ticks: { stepSize: 1 } }, y2: { min: 0, max: 100 } });
         }
         
         // Check if question is an aggregation/count query
@@ -1072,10 +1080,15 @@
             });
 
             // Overlay toggle pills (sleep / CTL / ATL / TSB / restedness / DOMS)
+            // Auto-pair restedness + sleep so you never look at one without the other.
             document.querySelectorAll('.overlay-pill input[data-overlay]').forEach(input => {
                 if (input.dataset.overlay === 'weight') return; // handled above
                 input.addEventListener('change', () => {
                     overlayOn[input.dataset.overlay] = input.checked;
+                    if (input.dataset.overlay === 'restedness_am' && input.checked) {
+                        const sleep = document.querySelector('.overlay-pill input[data-overlay="sleep_hours"]');
+                        if (sleep && !sleep.checked) { sleep.checked = true; overlayOn.sleep_hours = true; }
+                    }
                     updateCharts();
                 });
             });
