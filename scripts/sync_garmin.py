@@ -132,27 +132,20 @@ def sync(conn, client):
             if isinstance(score, dict):
                 overall = score.get("overall")
                 score_val = overall.get("value") if isinstance(overall, dict) else overall
+            # Sleep is Fitbit-direct only — Garmin no longer writes sleep_hours.
+            # If Fitbit OAuth fails, the day stays NULL (visible gap) rather than
+            # silently filling with Garmin data. Raw is still kept for diagnostics.
             if total_sec > 0:
                 with conn.cursor() as cur:
-                    # Don't clobber Fitbit-via-TP sleep — Paul prefers Fitbit when both exist.
                     cur.execute(
                         """
-                        INSERT INTO daily_metrics (date, sleep_hours, sleep_score, sleep_source, source, raw, updated_at)
-                        VALUES (%s, %s, %s, 'garmin', 'garmin', %s, NOW())
+                        INSERT INTO daily_metrics (date, source, raw, updated_at)
+                        VALUES (%s, 'garmin', %s, NOW())
                         ON CONFLICT (date) DO UPDATE
-                          SET sleep_hours  = CASE
-                                WHEN daily_metrics.sleep_source IN ('fitbit') THEN daily_metrics.sleep_hours
-                                ELSE EXCLUDED.sleep_hours
-                              END,
-                              sleep_score  = CASE
-                                WHEN daily_metrics.sleep_source IN ('fitbit') THEN daily_metrics.sleep_score
-                                ELSE EXCLUDED.sleep_score
-                              END,
-                              sleep_source = COALESCE(daily_metrics.sleep_source, 'garmin'),
-                              raw          = EXCLUDED.raw,
-                              updated_at   = NOW()
+                          SET raw        = EXCLUDED.raw,
+                              updated_at = NOW()
                         """,
-                        (d.isoformat(), round(total_sec / 3600, 2), score_val, Json(s)),
+                        (d.isoformat(), Json(s)),
                     )
                 rows_written += 1
         except Exception as e:

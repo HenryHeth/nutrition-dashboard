@@ -862,13 +862,13 @@
             const ck = filteredCheckins();
             const labels = ck.map(d => d.date);
 
-            // Restedness AM/PM vs Sleep score (dual axis)
+            // Restedness AM/PM vs Sleep hours (dual axis)
             if (restednessChart) restednessChart.destroy();
             restednessChart = lineChart('restednessChart', labels, [
                 { label: 'Restedness AM', data: ck.map(d => d.restedness_am), borderColor: '#4ade80', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
                 { label: 'Restedness PM', data: ck.map(d => d.restedness_pm), borderColor: '#86efac', borderDash: [4,4], backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3 },
-                { label: `Sleep score (${prettySleepSource(ck)})`, data: ck.map(d => d.sleep_score),   borderColor: '#fb923c', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'y2' }
-            ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } }, y2: { min: 0, max: 100 } });
+                { label: `Sleep (${prettySleepSource(ck)} hrs)`, data: ck.map(d => d.sleep_hours), borderColor: '#fb923c', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3, yAxisID: 'y2' }
+            ], { y: { min: 0, max: 5, ticks: { stepSize: 1 } }, y2: { min: 0, max: 12 } });
 
             // Mood — GitHub-style 60-day grid
             const moodGrid = document.getElementById('moodGrid');
@@ -921,14 +921,14 @@
                     borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3
                 },
                 {
-                    label: `Sleep score (${prettySleepSource(ck)})`,
-                    data: ck.map(d => d.sleep_score),
+                    label: `Sleep (${prettySleepSource(ck)} hrs)`,
+                    data: ck.map(d => d.sleep_hours),
                     borderColor: '#fb923c',
                     backgroundColor: 'transparent',
                     borderWidth: 2, pointRadius: 1.5, spanGaps: true, tension: 0.3,
                     yAxisID: 'y2'
                 }
-            ], { y: { min: -4, max: 4, ticks: { stepSize: 1 } }, y2: { min: 0, max: 100 } });
+            ], { y: { min: -4, max: 4, ticks: { stepSize: 1 } }, y2: { min: 0, max: 12 } });
         }
         
         // Check if question is an aggregation/count query

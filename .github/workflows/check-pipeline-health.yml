@@ -1,0 +1,94 @@
+name: Pipeline Health Check
+
+# Runs after both daily syncs complete (Vercel cron @ 13:00 UTC, Garmin cron @ 13:15 UTC).
+# If any source errored in the last 24h, fails the workflow → GitHub emails repo admin.
+# Open the failing run for the exact error + restore steps.
+
+on:
+  schedule:
+    - cron: "30 13 * * *"   # 06:30 PDT, 15 min after Garmin sync wraps
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Query pipeline_runs for recent failures
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          set -eo pipefail
+          echo "## Daily pipeline health check" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # 1. Any source errored in the last 24h?
+          ERRORS=$(psql "$NEON_DATABASE_URL" -tA -c "
+            SELECT source || '|' || COALESCE(LEFT(error, 300), '')
+            FROM pipeline_runs
+            WHERE finished_at > NOW() - INTERVAL '24 hours'
+              AND status = 'error'
+            ORDER BY finished_at DESC;
+          ")
+
+          # 2. Has every source successfully run in the last 30h? (catches silent skips)
+          MISSING=$(psql "$NEON_DATABASE_URL" -tA -c "
+            WITH expected(src) AS (
+              VALUES ('fitbit'), ('trainingpeaks'), ('garmin'), ('fatsecret'), ('signalcheck')
+            )
+            SELECT e.src FROM expected e
+            LEFT JOIN (
+              SELECT DISTINCT source FROM pipeline_runs
+              WHERE finished_at > NOW() - INTERVAL '30 hours' AND status = 'ok'
+            ) ok ON ok.source = e.src
+            WHERE ok.source IS NULL;
+          ")
+
+          # 3. Sleep freshness — Fitbit specifically (the can't-fall-back source)
+          STALE_SLEEP=$(psql "$NEON_DATABASE_URL" -tA -c "
+            SELECT MAX(date)::text FROM daily_metrics
+            WHERE sleep_source = 'fitbit' AND sleep_hours IS NOT NULL;
+          ")
+
+          FAIL=0
+
+          if [ -n "$ERRORS" ]; then
+            echo "### ❌ Sources errored in last 24h" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "$ERRORS" | awk -F '|' '{ printf "%-15s  %s\n", $1, $2 }' >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            FAIL=1
+          fi
+
+          if [ -n "$MISSING" ]; then
+            echo "### ❌ Sources with no successful run in 30h" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "$MISSING" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            FAIL=1
+          fi
+
+          # Sleep should be no more than 2 days stale (yesterday's sleep should be in)
+          if [ -n "$STALE_SLEEP" ]; then
+            DAYS_OLD=$(( ( $(date +%s) - $(date -d "$STALE_SLEEP" +%s) ) / 86400 ))
+            if [ "$DAYS_OLD" -gt 2 ]; then
+              echo "### ❌ Fitbit sleep stale: latest = $STALE_SLEEP ($DAYS_OLD days ago)" >> "$GITHUB_STEP_SUMMARY"
+              FAIL=1
+            fi
+          fi
+
+          if [ "$FAIL" -eq 0 ]; then
+            echo "### ✅ All sources healthy" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Latest Fitbit sleep: $STALE_SLEEP" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Restore steps" >> "$GITHUB_STEP_SUMMARY"
+            echo "See [docs/runbooks/RESTORE_PIPELINE.md](https://github.com/HenryHeth/nutrition-dashboard/blob/main/docs/runbooks/RESTORE_PIPELINE.md)" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
