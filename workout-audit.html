@@ -108,6 +108,24 @@
         .status-msg { color: var(--good); font-size: 0.8rem; margin-left: 0.5rem; }
         .status-msg.error { color: var(--bad); }
         .empty { color: #888; padding: 2rem; text-align: center; }
+        tr.flagged { background: rgba(239, 68, 68, 0.07); }
+        .flag-list { color: var(--warn); font-size: 0.78rem; margin-top: 0.2rem; line-height: 1.4; }
+        .flag-list .danger { color: var(--bad); font-weight: 600; }
+        .missing-dates {
+            font-family: ui-monospace, monospace;
+            font-size: 0.75rem;
+            color: #aaa;
+            margin-top: 0.2rem;
+        }
+        .missing-dates code {
+            background: rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
+            padding: 0.1rem 0.35rem;
+            border-radius: 3px;
+            margin-right: 0.25rem;
+        }
+        details summary { cursor: pointer; color: #888; font-size: 0.78rem; }
+        details summary:hover { color: var(--accent); }
     </style>
 </head>
 <body>
@@ -126,7 +144,7 @@
                     <option value="180">180 days</option>
                 </select>
             </label>
-            <label><input type="checkbox" id="flaggedOnly"> Only flagged (variance &gt; 10%)</label>
+            <label><input type="checkbox" id="flaggedOnly" checked> Only flagged (missing weight or &gt;10% variance)</label>
             <button id="reloadBtn">Reload</button>
             <span id="summary" style="color:#888;font-size:0.85rem;margin-left:auto"></span>
         </div>
@@ -159,9 +177,21 @@
 
         function render() {
             const flaggedOnly = document.getElementById('flaggedOnly').checked;
-            const visible = flaggedOnly ? rows.filter(r => r.flagged) : rows;
+            // Sort: flagged first (most-missing-weight at top), then by times_logged desc
+            const sorted = [...rows].sort((a, b) => {
+                if (a.flagged !== b.flagged) return a.flagged ? -1 : 1;
+                if ((b.missing_weight_sets || 0) !== (a.missing_weight_sets || 0))
+                    return (b.missing_weight_sets || 0) - (a.missing_weight_sets || 0);
+                return b.times_logged - a.times_logged;
+            });
+            const visible = flaggedOnly ? sorted.filter(r => r.flagged) : sorted;
+            const flaggedCount = rows.filter(r => r.flagged).length;
+            const missingTotal = rows.reduce((s, r) => s + (r.missing_weight_sets || 0), 0);
+            const summary = document.getElementById('summary');
+            summary.innerHTML = `${rows.length} exercises · <strong style="color:${flaggedCount?'var(--bad)':'var(--good)'}">${flaggedCount} flagged</strong>${missingTotal ? ` · <strong style="color:var(--bad)">${missingTotal} sets missing weight</strong>` : ''}`;
+
             if (!visible.length) {
-                document.getElementById('tableWrap').innerHTML = '<div class="empty">No exercises match. (Pipeline may not have populated workout_sets yet.)</div>';
+                document.getElementById('tableWrap').innerHTML = `<div class="empty">${flaggedOnly ? '✅ Nothing flagged — no missing weights or unusual variance.' : 'No exercises in window.'}</div>`;
                 return;
             }
             const html = `
@@ -170,12 +200,13 @@
                         <tr>
                             <th>Exercise</th>
                             <th class="right">Times</th>
+                            <th class="right">Missing</th>
                             <th>Logged weights</th>
                             <th class="right">Min</th>
                             <th class="right">Max</th>
                             <th class="right">Mean</th>
                             <th class="right">Var %</th>
-                            <th>Standard (lbs)</th>
+                            <th>Bodyweight standard (lbs)</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -183,25 +214,37 @@
                         ${visible.map(r => `
                             <tr class="${r.flagged ? 'flagged' : ''} ${r.is_bodyweight ? 'bodyweight' : ''}" data-ex="${escapeAttr(r.exercise)}">
                                 <td>
-                                    ${escapeHtml(r.exercise)}
-                                    ${r.category ? `<span class="pill cat-${r.category}">${r.category.replace('_',' ')}</span>` : ''}
-                                    ${r.is_bodyweight ? '<span class="pill">bodyweight</span>' : ''}
+                                    <div>
+                                        ${escapeHtml(r.exercise)}
+                                        ${r.category ? `<span class="pill cat-${r.category}">${r.category.replace('_',' ')}</span>` : ''}
+                                        ${r.is_bodyweight ? '<span class="pill">bodyweight</span>' : ''}
+                                    </div>
+                                    ${r.flag_reasons && r.flag_reasons.length ? `<div class="flag-list">⚠ ${r.flag_reasons.map(escapeHtml).join(' · ')}</div>` : ''}
+                                    ${r.missing_dates && r.missing_dates.length ? `
+                                        <details>
+                                            <summary>Missing-weight sessions (${r.missing_dates.length}) — fix these in Garmin</summary>
+                                            <div class="missing-dates">
+                                                ${r.missing_dates.map(d => `<code>${d.date} (${d.sets} set${d.sets>1?'s':''})</code>`).join('')}
+                                            </div>
+                                        </details>
+                                    ` : ''}
                                 </td>
                                 <td class="right">${r.times_logged}</td>
+                                <td class="right" style="color:${r.missing_weight_sets ? 'var(--bad)' : '#666'};font-weight:${r.missing_weight_sets ? 600 : 400}">${r.missing_weight_sets || 0}</td>
                                 <td class="weights" title="${(r.weights || []).join(', ')}">${(r.weights || []).join(', ') || '—'}</td>
                                 <td class="right">${r.min_lbs ?? '—'}</td>
                                 <td class="right">${r.max_lbs ?? '—'}</td>
                                 <td class="right">${r.mean_lbs ?? '—'}</td>
                                 <td class="right" style="color:${r.variance_pct > 10 ? 'var(--warn)' : '#aaa'}">${r.variance_pct}%</td>
-                                <td>
+                                <td>${r.is_bodyweight ? `
                                     <input class="std-input" type="number" step="1"
                                         value="${r.current_standard ?? r.suggested_standard ?? ''}"
                                         placeholder="${r.suggested_standard ?? ''}">
-                                </td>
-                                <td>
+                                ` : '<span style="color:#555;font-size:0.75rem">n/a</span>'}</td>
+                                <td>${r.is_bodyweight ? `
                                     <button class="ghost std-btn">Standardise</button>
                                     <span class="status-msg" hidden></span>
-                                </td>
+                                ` : ''}</td>
                             </tr>
                         `).join('')}
                     </tbody>
