@@ -868,12 +868,16 @@
                     const json = await res.json();
                     trainingVolumeData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
                     console.log(`Loaded ${trainingVolumeData.length} training-volume rows`);
-                    // Proactive missing-weight indicator near the DOMS chart
+                    // Proactive indicator near the DOMS chart — covers missing weight AND missing reps
                     const alert = document.getElementById('missingWeightAlert');
                     if (alert) {
-                        const n = json.missing_weight_sets || 0;
-                        if (n > 0) {
-                            alert.textContent = `⚠ ${n} set${n>1?'s':''} missing weight — fix in Garmin`;
+                        const w = json.missing_weight_sets || 0;
+                        const r = json.missing_reps_sets   || 0;
+                        const parts = [];
+                        if (w > 0) parts.push(`${w} missing weight`);
+                        if (r > 0) parts.push(`${r} missing reps`);
+                        if (parts.length) {
+                            alert.textContent = `⚠ ${parts.join(' · ')} — fix in Garmin`;
                             alert.style.display = 'inline-block';
                         } else {
                             alert.style.display = 'none';

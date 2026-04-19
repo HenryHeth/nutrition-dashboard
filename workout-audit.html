@@ -232,7 +232,8 @@
                         <tr>
                             ${sortableTh('exercise', 'Exercise')}
                             ${sortableTh('times_logged', 'Times', { right: true })}
-                            ${sortableTh('missing_weight_sets', 'Missing', { right: true })}
+                            ${sortableTh('missing_weight_sets', 'Missing weight', { right: true })}
+                            ${sortableTh('missing_reps_sets',   'Missing reps',   { right: true })}
                             <th>Logged weights</th>
                             ${sortableTh('min_lbs', 'Min', { right: true })}
                             ${sortableTh('max_lbs', 'Max', { right: true })}
@@ -263,6 +264,7 @@
                                 </td>
                                 <td class="right">${r.times_logged}</td>
                                 <td class="right" style="color:${r.missing_weight_sets ? 'var(--bad)' : '#666'};font-weight:${r.missing_weight_sets ? 600 : 400}">${r.missing_weight_sets || 0}</td>
+                                <td class="right" style="color:${r.missing_reps_sets   ? 'var(--bad)' : '#666'};font-weight:${r.missing_reps_sets   ? 600 : 400}">${r.missing_reps_sets   || 0}</td>
                                 <td class="weights" title="${(r.weights || []).join(', ')}">${(r.weights || []).join(', ') || '—'}</td>
                                 <td class="right">${r.min_lbs ?? '—'}</td>
                                 <td class="right">${r.max_lbs ?? '—'}</td>
