@@ -142,7 +142,11 @@
 <body>
     <div class="topbar">
         <h1>🏋️ Workout Audit</h1>
-        <a href="/" class="back">← Dashboard</a>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+            <span id="syncStatus" style="font-size:0.78rem; color:#888;"></span>
+            <button id="resyncBtn" title="Pull fresh data from Garmin + other sources">🔄 Re-sync now</button>
+            <a href="/" class="back">← Dashboard</a>
+        </div>
     </div>
 
     <div class="card">
@@ -346,7 +350,70 @@
         document.getElementById('reloadBtn').addEventListener('click', load);
         document.getElementById('flaggedOnly').addEventListener('change', render);
 
-        load();
+        // === Re-sync ===
+        async function refreshSyncStatus() {
+            try {
+                const r = await fetch('/api/fitness/sync', { headers });
+                const j = await r.json();
+                if (!j.sources?.length) return;
+                const lines = j.sources.map(s => {
+                    const ago = s.minutes_ago == null ? '?' : (s.minutes_ago < 60 ? `${s.minutes_ago}m ago` : `${Math.floor(s.minutes_ago/60)}h ago`);
+                    const tick = s.status === 'ok' ? '✓' : '✗';
+                    return `${tick} ${s.source} ${ago}`;
+                });
+                document.getElementById('syncStatus').innerHTML =
+                    `<span style="color:${j.stale ? 'var(--bad)' : 'var(--good)'}">${j.stale ? '⚠ stale' : 'fresh'}</span> · ${lines.join(' · ')}`;
+            } catch (e) {}
+        }
+
+        async function triggerSync() {
+            const btn = document.getElementById('resyncBtn');
+            btn.disabled = true;
+            btn.textContent = '🔄 Syncing…';
+            document.getElementById('syncStatus').textContent = 'Sync triggered. Garmin takes ~60-90s, other sources ~30s.';
+            try {
+                const r = await fetch('/api/fitness/sync', { method: 'POST', headers });
+                const j = await r.json();
+                if (!j.success || j.garmin?.ok === false) {
+                    document.getElementById('syncStatus').innerHTML = `<span style="color:var(--bad)">Sync error: ${j.garmin?.error || 'unknown'}</span>`;
+                    btn.disabled = false;
+                    btn.textContent = '🔄 Re-sync now';
+                    return;
+                }
+                // Poll status, reload audit data when sources show recent updates
+                let polls = 0;
+                const max = 30;  // 30 × 5s = 150s max
+                const interval = setInterval(async () => {
+                    polls++;
+                    await refreshSyncStatus();
+                    const status = await fetch('/api/fitness/sync', { headers }).then(r => r.json());
+                    const recentlyOk = status.sources.filter(s => s.status === 'ok' && s.minutes_ago != null && s.minutes_ago < 2);
+                    if (recentlyOk.length >= 2 || polls >= max) {
+                        clearInterval(interval);
+                        btn.disabled = false;
+                        btn.textContent = '🔄 Re-sync now';
+                        await load();  // refresh the audit table
+                    }
+                }, 5000);
+            } catch (e) {
+                document.getElementById('syncStatus').innerHTML = `<span style="color:var(--bad)">Sync failed: ${e.message}</span>`;
+                btn.disabled = false;
+                btn.textContent = '🔄 Re-sync now';
+            }
+        }
+        document.getElementById('resyncBtn').addEventListener('click', triggerSync);
+
+        // Initial: load audit + sync status. Auto-trigger if data is stale.
+        (async () => {
+            await load();
+            await refreshSyncStatus();
+            const r = await fetch('/api/fitness/sync', { headers });
+            const j = await r.json();
+            if (j.stale) {
+                document.getElementById('syncStatus').innerHTML += ` <a href="#" id="autoSyncLink" style="color:var(--accent)">Auto-syncing…</a>`;
+                triggerSync();
+            }
+        })();
     </script>
 </body>
 </html>

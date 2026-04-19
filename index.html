@@ -1776,6 +1776,29 @@
             await loadData();
             initResizeHandles();
             initMatt();
+
+            // Silent auto-sync: if the latest pipeline run is more than 4 hours old,
+            // trigger a fresh pull in the background and reload data when it finishes.
+            try {
+                const status = await fetch('/api/fitness/sync', { headers: getAuthHeaders() }).then(r => r.json());
+                if (status.stale) {
+                    console.log('Pipeline data stale — auto-syncing in background…');
+                    await fetch('/api/fitness/sync', { method: 'POST', headers: getAuthHeaders() });
+                    // Poll until ok, then refresh charts
+                    let polls = 0;
+                    const tick = setInterval(async () => {
+                        polls++;
+                        const s = await fetch('/api/fitness/sync', { headers: getAuthHeaders() }).then(r => r.json());
+                        const fresh = s.sources.filter(x => x.status === 'ok' && x.minutes_ago != null && x.minutes_ago < 2);
+                        if (fresh.length >= 2 || polls >= 30) {
+                            clearInterval(tick);
+                            console.log('Auto-sync done — reloading charts');
+                            await Promise.all([loadWeightData(), loadOverlayData(), loadTrainingVolumeData(), loadCheckinData(), loadWeeklyVolumeData(), loadBodyCompData(), loadHabits()]);
+                            updateCharts();
+                        }
+                    }, 5000);
+                }
+            } catch (e) { console.log('Sync status check failed:', e.message); }
         })();
     </script>
 </body>

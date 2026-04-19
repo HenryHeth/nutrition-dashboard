@@ -21,7 +21,8 @@ const handlers = {
   'habits':              require('../../lib/handlers/habits'),
   'workout-audit':       require('../../lib/handlers/workout-audit'),
   'exercise-standards':  require('../../lib/handlers/exercise-standards'),
-  'matt-synopsis':       require('../../lib/handlers/matt-synopsis')
+  'matt-synopsis':       require('../../lib/handlers/matt-synopsis'),
+  'sync':                require('../../lib/handlers/sync')
 };
 
 module.exports = (req, res) => {
