@@ -126,6 +126,10 @@
         }
         details summary { cursor: pointer; color: #888; font-size: 0.78rem; }
         details summary:hover { color: var(--accent); }
+        th.sortable { cursor: pointer; user-select: none; }
+        th.sortable:hover { color: var(--accent); }
+        th.sortable .arrow { display: inline-block; margin-left: 0.2rem; opacity: 0.4; font-size: 0.7rem; }
+        th.sortable.active .arrow { opacity: 1; color: var(--accent); }
     </style>
 </head>
 <body>
@@ -144,7 +148,7 @@
                     <option value="180">180 days</option>
                 </select>
             </label>
-            <label><input type="checkbox" id="flaggedOnly" checked> Only flagged (missing weight or &gt;10% variance)</label>
+            <label><input type="checkbox" id="flaggedOnly" checked> Only flagged (bodyweight exercises missing weight)</label>
             <button id="reloadBtn">Reload</button>
             <span id="summary" style="color:#888;font-size:0.85rem;margin-left:auto"></span>
         </div>
@@ -159,6 +163,9 @@
         const headers = { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) };
 
         let rows = [];
+        // Column sort state — default: missing-weight desc (problems first), then times desc
+        let sortKey = 'missing_weight_sets';
+        let sortDir = 'desc';
 
         async function load() {
             const days = document.getElementById('daysSelect').value;
@@ -175,15 +182,31 @@
             }
         }
 
+        function setSort(key) {
+            if (sortKey === key) sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+            else { sortKey = key; sortDir = 'desc'; }
+            render();
+        }
+
+        function compareRows(a, b) {
+            const va = a[sortKey], vb = b[sortKey];
+            const dir = sortDir === 'desc' ? -1 : 1;
+            // Push nulls to the bottom regardless of direction
+            if (va == null && vb == null) return 0;
+            if (va == null) return 1;
+            if (vb == null) return -1;
+            if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+            return String(va).localeCompare(String(vb)) * dir;
+        }
+
+        function arrow(key) {
+            if (sortKey !== key) return '<span class="arrow">↕</span>';
+            return `<span class="arrow">${sortDir === 'desc' ? '↓' : '↑'}</span>`;
+        }
+
         function render() {
             const flaggedOnly = document.getElementById('flaggedOnly').checked;
-            // Sort: flagged first (most-missing-weight at top), then by times_logged desc
-            const sorted = [...rows].sort((a, b) => {
-                if (a.flagged !== b.flagged) return a.flagged ? -1 : 1;
-                if ((b.missing_weight_sets || 0) !== (a.missing_weight_sets || 0))
-                    return (b.missing_weight_sets || 0) - (a.missing_weight_sets || 0);
-                return b.times_logged - a.times_logged;
-            });
+            const sorted = [...rows].sort(compareRows);
             const visible = flaggedOnly ? sorted.filter(r => r.flagged) : sorted;
             const flaggedCount = rows.filter(r => r.flagged).length;
             const missingTotal = rows.reduce((s, r) => s + (r.missing_weight_sets || 0), 0);
@@ -191,21 +214,23 @@
             summary.innerHTML = `${rows.length} exercises · <strong style="color:${flaggedCount?'var(--bad)':'var(--good)'}">${flaggedCount} flagged</strong>${missingTotal ? ` · <strong style="color:var(--bad)">${missingTotal} sets missing weight</strong>` : ''}`;
 
             if (!visible.length) {
-                document.getElementById('tableWrap').innerHTML = `<div class="empty">${flaggedOnly ? '✅ Nothing flagged — no missing weights or unusual variance.' : 'No exercises in window.'}</div>`;
+                document.getElementById('tableWrap').innerHTML = `<div class="empty">${flaggedOnly ? '✅ Nothing flagged — no bodyweight exercises with missing weight.' : 'No exercises in window.'}</div>`;
                 return;
             }
+            const sortableTh = (key, label, opts = {}) => `
+                <th class="sortable ${sortKey===key?'active':''} ${opts.right?'right':''}" data-sort="${key}">${label}${arrow(key)}</th>`;
             const html = `
                 <table>
                     <thead>
                         <tr>
-                            <th>Exercise</th>
-                            <th class="right">Times</th>
-                            <th class="right">Missing</th>
+                            ${sortableTh('exercise', 'Exercise')}
+                            ${sortableTh('times_logged', 'Times', { right: true })}
+                            ${sortableTh('missing_weight_sets', 'Missing', { right: true })}
                             <th>Logged weights</th>
-                            <th class="right">Min</th>
-                            <th class="right">Max</th>
-                            <th class="right">Mean</th>
-                            <th class="right">Var %</th>
+                            ${sortableTh('min_lbs', 'Min', { right: true })}
+                            ${sortableTh('max_lbs', 'Max', { right: true })}
+                            ${sortableTh('mean_lbs', 'Mean', { right: true })}
+                            ${sortableTh('variance_pct', 'Var %', { right: true })}
                             <th>Bodyweight standard (lbs)</th>
                             <th></th>
                         </tr>
@@ -253,6 +278,9 @@
             document.getElementById('tableWrap').innerHTML = html;
             document.querySelectorAll('.std-btn').forEach(btn => {
                 btn.addEventListener('click', onStandardise);
+            });
+            document.querySelectorAll('th.sortable').forEach(th => {
+                th.addEventListener('click', () => setSort(th.dataset.sort));
             });
         }
 
