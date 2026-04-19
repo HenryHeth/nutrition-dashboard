@@ -554,7 +554,10 @@
     </div>
 
     <div class="chart-container resizable">
-        <div class="chart-title">DOMS vs Training Volume <span style="color:#888;font-weight:400;font-size:0.85rem;">— ceiling check (spec §4c)</span></div>
+        <div class="chart-title">
+            DOMS vs Training Volume <span style="color:#888;font-weight:400;font-size:0.85rem;">— ceiling check (spec §4c)</span>
+            <a id="missingWeightAlert" href="/workout-audit" style="display:none; margin-left:0.75rem; padding:0.2rem 0.55rem; background:rgba(239,68,68,0.18); color:#fca5a5; border:1px solid rgba(239,68,68,0.4); border-radius:999px; font-size:0.72rem; font-weight:600; text-decoration:none;" title="Open audit to fix in Garmin"></a>
+        </div>
         <div class="chart-wrapper" id="domsVolumeWrapper">
             <canvas id="domsVolumeChart"></canvas>
         </div>
@@ -857,11 +860,25 @@
         // Load daily training volume + DOMS — spec §4c
         async function loadTrainingVolumeData() {
             try {
-                const res = await fetch('/api/fitness/training-volume', { headers: getAuthHeaders() });
+                const start = document.getElementById('startDate')?.value;
+                const end   = document.getElementById('endDate')?.value;
+                const qs = (start && end) ? `?from=${start}&to=${end}` : '';
+                const res = await fetch(`/api/fitness/training-volume${qs}`, { headers: getAuthHeaders() });
                 if (res.ok) {
                     const json = await res.json();
                     trainingVolumeData = (json.data || []).slice().sort((a,b) => a.date.localeCompare(b.date));
                     console.log(`Loaded ${trainingVolumeData.length} training-volume rows`);
+                    // Proactive missing-weight indicator near the DOMS chart
+                    const alert = document.getElementById('missingWeightAlert');
+                    if (alert) {
+                        const n = json.missing_weight_sets || 0;
+                        if (n > 0) {
+                            alert.textContent = `⚠ ${n} set${n>1?'s':''} missing weight — fix in Garmin`;
+                            alert.style.display = 'inline-block';
+                        } else {
+                            alert.style.display = 'none';
+                        }
+                    }
                 }
             } catch (e) {
                 console.log('Training-volume endpoint not yet available');

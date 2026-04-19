@@ -123,6 +123,13 @@
             padding: 0.1rem 0.35rem;
             border-radius: 3px;
             margin-right: 0.25rem;
+            display: inline-block;
+            margin-bottom: 0.2rem;
+        }
+        .missing-dates a { text-decoration: none; }
+        .missing-dates a:hover code {
+            background: rgba(239, 68, 68, 0.35);
+            color: #fff;
         }
         details summary { cursor: pointer; color: #888; font-size: 0.78rem; }
         details summary:hover { color: var(--accent); }
@@ -246,10 +253,10 @@
                                     </div>
                                     ${r.flag_reasons && r.flag_reasons.length ? `<div class="flag-list">⚠ ${r.flag_reasons.map(escapeHtml).join(' · ')}</div>` : ''}
                                     ${r.missing_dates && r.missing_dates.length ? `
-                                        <details>
-                                            <summary>Missing-weight sessions (${r.missing_dates.length}) — fix these in Garmin</summary>
+                                        <details open>
+                                            <summary>Missing-weight sessions (${r.missing_dates.length}) — click to open in Garmin</summary>
                                             <div class="missing-dates">
-                                                ${r.missing_dates.map(d => `<code>${d.date} (${d.sets} set${d.sets>1?'s':''})</code>`).join('')}
+                                                ${r.missing_dates.map(d => `<a href="https://connect.garmin.com/modern/activity/${d.session_id}" target="_blank" rel="noopener"><code>${d.date} (${d.sets} set${d.sets>1?'s':''}) ↗</code></a>`).join('')}
                                             </div>
                                         </details>
                                     ` : ''}
