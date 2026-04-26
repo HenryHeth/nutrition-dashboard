@@ -23,7 +23,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.garth
-          key: garth-token-${{ github.run_id }}
+          key: garth-token-v1
           restore-keys: |
             garth-token-
 

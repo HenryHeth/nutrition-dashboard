@@ -29,6 +29,12 @@ WINDOW_DAYS = int(os.environ.get("GARMIN_WINDOW_DAYS", "60"))   # daily run back
 TOKEN_DIR = os.path.expanduser("~/.garth")
 
 
+def is_rate_limited(exc: Exception) -> bool:
+    """Return True if the exception indicates Garmin is rate-limiting us (429)."""
+    msg = str(exc).lower()
+    return "429" in msg or "too many" in msg or "retryerror" in type(exc).__name__.lower()
+
+
 def get_client():
     email = os.environ["GARMIN_EMAIL"]
     password = os.environ["GARMIN_PASSWORD"]
@@ -39,8 +45,17 @@ def get_client():
             print("Logged in via cached token", file=sys.stderr)
             return client
         except Exception as e:
+            if is_rate_limited(e):
+                print(f"Garmin rate-limiting token refresh — skipping today's sync: {e}", file=sys.stderr)
+                sys.exit(0)
             print(f"Cache failed: {e}", file=sys.stderr)
-    client.login()
+    try:
+        client.login()
+    except Exception as e:
+        if is_rate_limited(e):
+            print(f"Garmin rate-limiting fresh login — skipping today's sync: {e}", file=sys.stderr)
+            sys.exit(0)
+        raise
     os.makedirs(TOKEN_DIR, exist_ok=True)
     client.garth.dump(TOKEN_DIR)
     return client
